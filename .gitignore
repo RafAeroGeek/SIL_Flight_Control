@@ -1,0 +1,46 @@
+# ---------- Compilacion (CMake / KDevelop) ----------
+build/
+build-*/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+*.o
+*.a
+*.so
+*.exe
+
+# ---------- Restos de Code::Blocks (Windows) ----------
+# Contienen rutas absolutas C:\Users\... y se regeneran solos.
+*.cbp
+*.depend
+*.layout
+*.cscope_file_list
+obj/
+bin/
+
+# ---------- Datos generados por la simulacion ----------
+# El CSV y el HTML de Plotly se regeneran en cada corrida y pesan MB.
+data/*.csv
+data/*.html
+data/*.png
+!data/.gitkeep
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.spyproject/
+.venv/
+venv/
+
+# ---------- IDE / sistema ----------
+.kdev4/
+*.kdev4
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
