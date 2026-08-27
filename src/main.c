@@ -17,10 +17,8 @@
 #include <stdio.h>
 #endif
 
-#define SERVO_ELEVATOR   0u
-#define SERVO_AILERON    1u
-#define SERVO_RUDDER     2u
-#define SERVO_THROTTLE   3u
+/* Los identificadores de canal (SERVO_ELEVATOR, ...) viven en servo_sim.h
+   como enum ServoChannel_e: fuente unica de verdad del mapeo canal->superficie. */
 #define SERVO_FLAPS      4u
 
 /* ====== Globals SIM ====== */
@@ -137,7 +135,7 @@ void task_init_1ms(void)
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
         printf("  Elevator: %.2f deg\n", g_act.elevator);
         printf("  Rudder:   %.2f deg\n", g_act.rudder);
-        printf("  Throttle: %.2f %%\n", g_act.throttle);
+        printf("  Throttle: %.3f [0-1]\n", g_act.throttle);
 
          /* 5) Abrir CSV */
         g_fp = fopen(csv_path, "w");
@@ -148,7 +146,7 @@ void task_init_1ms(void)
             fprintf(g_fp, "t_s,"                          // tiempo
                          "elev_cmd_us,ail_cmd_us,rud_cmd_us,thro_cmd_us,"  // comandos us
                          "rc_pitch,rc_roll,rc_yaw,rc_throttle,rc_flaps,"   // señales RC
-                         "y_elev_deg,y_ail_deg,y_rud_deg,y_thro_perc,"     // salidas
+                         "y_elev_deg,y_ail_deg,y_rud_deg,y_thro_norm,"     // salidas
                          "u_elev_us,u_ail_us,u_rud_us,u_thro_us,"          // comandos efectivos
                          "pilot_roll,pilot_pitch,pilot_yaw,pilot_throttle," // comandos originales
                          "mode,arm,"                                         // modos

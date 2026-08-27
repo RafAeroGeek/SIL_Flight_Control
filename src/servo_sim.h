@@ -16,6 +16,19 @@
 extern "C" {
 #endif
 
+/* Fuente unica de verdad del mapeo canal -> superficie de control.
+   La tabla g_cfg[] en servo_sim.c se indexa con este enum. Para agregar un
+   servo: anadir el enumerador aqui y su fila en g_cfg[]; el _Static_assert
+   de servo_sim.c obliga a que ambos concuerden. */
+typedef enum
+{
+    SERVO_ELEVATOR = 0,
+    SERVO_AILERON,
+    SERVO_RUDDER,
+    SERVO_THROTTLE,
+    SERVO_SIM_CH_COUNT      /* centinela: numero de canales */
+} ServoChannel_e;
+
 #ifndef SERVO_SIM_N_SERVOS
 #define SERVO_SIM_N_SERVOS (4u)
 #endif
