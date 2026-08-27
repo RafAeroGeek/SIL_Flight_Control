@@ -19,7 +19,6 @@
 
 /* Los identificadores de canal (SERVO_ELEVATOR, ...) viven en servo_sim.h
    como enum ServoChannel_e: fuente unica de verdad del mapeo canal->superficie. */
-#define SERVO_FLAPS      4u
 
 /* ====== Globals SIM ====== */
 static int g_Total_Time_ms = SIMULATION_TIME_ms;
