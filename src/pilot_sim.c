@@ -9,7 +9,7 @@ pilotcommand_s pilot_source_commands(uint32_t now_ms, unsigned id_routine)
     pilotcommand_s current_commands;
 
     switch(id_routine){
-        case 1:
+        case ROUTINE_LONGITUDINAL:
             current_commands.roll       = 0.0 + step_cmd(now_ms, 40u, 1.0);// + step_cmd(now_ms, 300u, -1.0);
             current_commands.pitch      = 0.0 + step_cmd(now_ms, 50u, 1.0) + step_cmd(now_ms, 150u, -2.0) + step_cmd(now_ms, 200u, 1.0);
             current_commands.yaw        = 0.0;
@@ -20,7 +20,25 @@ pilotcommand_s pilot_source_commands(uint32_t now_ms, unsigned id_routine)
 
             current_commands.flaps      = 0.0;
             break;
-        case 2:
+        case ROUTINE_LAT_DIR:
+            /* roll/pitch identicos a ROUTINE_LONGITUDINAL: la planta se integra
+               solo con delta_elv, asi que el estado debe coincidir con esa
+               rutina (criterio de aceptacion). Solo yaw y throttle cambian. */
+            current_commands.roll       = 0.0 + step_cmd(now_ms, 40u, 1.0);
+            current_commands.pitch      = 0.0 + step_cmd(now_ms, 50u, 1.0) + step_cmd(now_ms, 150u, -2.0) + step_cmd(now_ms, 200u, 1.0);
+            /* yaw: doblete repartido entre 1.0 y 4.0 s; ~+/-12.6 deg en el rudder
+               (k=0.18 deg/us, tau=0.07 s, limite +/-30 deg). Unidades: us. */
+            current_commands.yaw        = step_cmd(now_ms, 1000u, 70.0) + step_cmd(now_ms, 2500u, -140.0) + step_cmd(now_ms, 4000u, 70.0);
+            /* throttle: pulso entre 6.0 y 8.5 s; ~0.44 normalizado
+               (k=0.002, tau=0.20 s, limite 1.0). Unidades: us. */
+            current_commands.throttle   = step_cmd(now_ms, 6000u, 220.0) + step_cmd(now_ms, 8500u, -220.0);
+
+            current_commands.mode_switch= 0;
+            current_commands.arm_switch = 0;
+
+            current_commands.flaps      = 0.0;
+            break;
+        case ROUTINE_ESTATICA:
             current_commands.roll       = 0.0;
             current_commands.pitch      = 0.0;
             current_commands.yaw        = 0.0;

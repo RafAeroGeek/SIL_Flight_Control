@@ -25,6 +25,10 @@
 #define 	SYSTEM_SIM_ENV		SIM_PLATFORM_PC			/// Sistema seleccionado
 #define 	AIRCRAFT_SIM		Coro_sim	/// Tipo de aeronave seleccionada
 
+/* Rutina de piloto activa (enum RoutineID en pilot_sim.h).
+   ROUTINE_LONGITUDINAL = rutina de regresion; ROUTINE_LAT_DIR ejercita yaw y throttle. */
+#define 	SIM_PILOT_ROUTINE	ROUTINE_LONGITUDINAL
+
 /********************************************/
 /*------------------------------------------*/
 

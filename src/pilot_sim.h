@@ -22,10 +22,11 @@ typedef struct
 
 typedef enum
 {
-    maneuver0 = 0,
-    maneuver1,
-    // agrega más...
-    maneuvertot
+    ROUTINE_NULA         = 0,   // todo a cero
+    ROUTINE_LONGITUDINAL = 1,   // roll + pitch: rutina de regresión actual
+    ROUTINE_ESTATICA     = 2,   // todo a cero (compat con el case 2 previo)
+    ROUTINE_LAT_DIR      = 3,   // escalones de yaw y throttle
+    ROUTINE_COUNT
 } RoutineID;
 
 typedef struct

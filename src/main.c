@@ -232,7 +232,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
      /* Comandos ejemplo (delta PWM us respecto a 1500) */
 
-     pilot = pilot_source_commands(now_ms, 1);
+     pilot = pilot_source_commands(now_ms, SIM_PILOT_ROUTINE);
 
      rc_sim = rc_source(pilot);
 
