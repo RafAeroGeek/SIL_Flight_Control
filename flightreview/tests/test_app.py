@@ -28,6 +28,27 @@ def test_cargar_ruta_valida(synthetic_csv):
     assert len(app.graficas.children) == 4
 
 
+def test_boton_export_genera_html(synthetic_csv, tmp_path, monkeypatch):
+    import os
+
+    import flightreview.app as app
+
+    salidas = []
+    monkeypatch.setattr(
+        app, "build_html",
+        lambda log: salidas.append(str(tmp_path / "r.html")) or _write(tmp_path / "r.html"),
+    )
+    app.cargar_ruta(synthetic_csv)
+    app._on_export()
+    assert "Reporte HTML escrito" in app.estado.text
+    assert os.path.exists(tmp_path / "r.html")
+
+
+def _write(p):
+    p.write_text("<html>ok</html>", encoding="utf-8")
+    return str(p)
+
+
 def _walk(model):
     yield model
     for child in getattr(model, "children", []) or []:

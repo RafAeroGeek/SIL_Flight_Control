@@ -31,6 +31,7 @@ from bokeh.models import Button, Div, FileInput, TextInput
 from flightreview.parser.loader import load_log
 from flightreview.plots.base import mode_legend_div
 from flightreview.plots.registry import render_all
+from flightreview.report import build_html
 
 # Ruta candidata para autocarga al arrancar (relativa a la raiz del repo).
 DEFAULT_LOG = os.path.join("data", "SIL_sim_servos2.csv")
@@ -43,12 +44,14 @@ estado = Div(text="Sin log cargado.")
 file_input = FileInput(accept=".csv", title="Cargar CSV")
 ruta_input = TextInput(title="...o ruta local", placeholder=DEFAULT_LOG, width=420)
 ruta_btn = Button(label="Cargar ruta", button_type="primary", width=110)
+export_btn = Button(label="Exportar reporte HTML", button_type="success", width=180)
 
 graficas = column(sizing_mode="stretch_width")
 
 root = column(
     titulo,
     row(file_input, ruta_input, ruta_btn),
+    row(export_btn),
     estado,
     graficas,
     sizing_mode="stretch_width",
@@ -103,8 +106,23 @@ def _on_file_input(attr, old, new) -> None:
         traceback.print_exc()
 
 
+def _on_export() -> None:
+    log = _estado_doc["log"]
+    if log is None:
+        estado.text = "Carga un log antes de exportar."
+        return
+    try:
+        out = build_html(log)
+    except Exception as exc:  # noqa: BLE001
+        estado.text = f"<span style='color:#c00'>Error exportando: {exc}</span>"
+        traceback.print_exc()
+        return
+    estado.text = f"Reporte HTML escrito en <code>{out}</code>"
+
+
 file_input.on_change("value", _on_file_input)
 ruta_btn.on_click(lambda: cargar_ruta(ruta_input.value or DEFAULT_LOG))
+export_btn.on_click(_on_export)
 
 # Autocarga al arrancar si el CSV por defecto existe.
 if os.path.exists(DEFAULT_LOG):
