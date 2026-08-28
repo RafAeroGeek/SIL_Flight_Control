@@ -14,6 +14,7 @@ SIL_Flight_Control/
 ├── CMakeLists.txt      Configuración de compilación
 ├── src/                Código C (10 módulos)
 ├── python/             Scripts de análisis y graficación
+├── flightreview/       Visor interactivo de logs (servidor Bokeh + reporte HTML)
 └── data/               CSV y HTML generados (ignorados por git)
 ```
 
@@ -61,6 +62,23 @@ el script más completo y actualizado. Resuelve la ruta del CSV a partir de su
 propia ubicación, así que funciona sin importar el directorio de trabajo.
 
 Requiere `pandas`, `numpy`, `matplotlib` y `plotly`.
+
+## Visor interactivo (`flightreview/`)
+
+Aplicación aparte, en `flightreview/`, para analizar el CSV de forma interactiva
+al estilo [Flight Review](https://logs.px4.io): servidor Bokeh con zoom (rueda),
+pan y hover; gráficas predefinidas de actitud, rapidez angular y vibración;
+fondo coloreado según el modo de vuelo; y exportación a un reporte HTML
+autocontenido.
+
+```bash
+# Desde la raíz del repo
+bokeh serve --show flightreview/app.py                          # servidor
+python -m flightreview.report data/SIL_sim_servos2.csv -o r.html # reporte HTML
+pytest flightreview                                              # pruebas
+```
+
+Detalles y pendientes en `flightreview/README.md`.
 
 ## Configuración de la simulación
 
