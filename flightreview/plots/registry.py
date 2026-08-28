@@ -49,8 +49,13 @@ def _iter_figures(model):
     return out
 
 
-# Se rellena en el commit de graficas predefinidas.
-PREDEFINED: list[PlotGroup] = []
+from flightreview.plots import angular_rate, attitude, vibration  # noqa: E402
+
+PREDEFINED: list[PlotGroup] = [
+    PlotGroup("Actitud", attitude.build),
+    PlotGroup("Rapidez angular", angular_rate.build),
+    PlotGroup("Vibracion", vibration.build),
+]
 
 
 def render_all(log: FlightLog):

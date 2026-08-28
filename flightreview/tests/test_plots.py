@@ -64,3 +64,64 @@ def test_log_source_y_x_range(synthetic_csv):
     xr = new_x_range(log)
     assert xr.start == 0.0
     assert xr.end > 0.5
+
+
+# --------------------------------------------------------------------------
+# Graficas predefinidas
+# --------------------------------------------------------------------------
+from bokeh.models import GlyphRenderer  # noqa: E402
+
+from flightreview.plots.registry import PREDEFINED, render_all  # noqa: E402
+
+
+def _lines(fig):
+    return [r for r in fig.renderers if isinstance(r, GlyphRenderer)]
+
+
+def test_predefined_son_las_tres():
+    assert [g.name for g in PREDEFINED] == ["Actitud", "Rapidez angular", "Vibracion"]
+
+
+def test_cada_builder_devuelve_figura_con_series_y_hover(synthetic_csv):
+    log = load_log(synthetic_csv)
+    models, xr = render_all(log)
+    assert len(models) == 3
+    for m in models:
+        assert isinstance(m, Plot)
+        assert _lines(m), "cada grafica debe tener al menos una serie"
+        assert any(isinstance(t, HoverTool) for t in m.tools)
+        # x_range compartido -> el mismo objeto en las tres
+        assert m.x_range is xr
+
+
+def test_actitud_pitch_presente_roll_yaw_no(synthetic_csv):
+    log = load_log(synthetic_csv)
+    fig = PREDEFINED[0].render(log, log_source(log), new_x_range(log))
+    assert len(_lines(fig)) == 1  # solo pitch
+    assert "no disponible" in fig.title.text
+    assert "Roll" in fig.title.text and "Yaw" in fig.title.text
+
+
+def test_vibracion_tiene_modulo_y_bandas(synthetic_csv):
+    log = load_log(synthetic_csv)
+    fig = PREDEFINED[2].render(log, log_source(log), new_x_range(log))
+    from bokeh.models import BoxAnnotation
+    boxes = [r for r in fig.renderers if isinstance(r, BoxAnnotation)]
+    # 3 bandas de modo (0->1->0) + 2 bandas de aviso
+    assert len(boxes) == 5
+    assert len(_lines(fig)) == 4  # acc x/y/z + |a|
+
+
+def test_angular_rate_incluye_dq_dashed(synthetic_csv):
+    log = load_log(synthetic_csv)
+    fig = PREDEFINED[1].render(log, log_source(log), new_x_range(log))
+    dashes = {tuple(r.glyph.line_dash) if r.glyph.line_dash else () for r in _lines(fig)}
+    assert len(_lines(fig)) == 4  # gyro x/y/z + dq
+    assert any(d for d in dashes), "dq debe ir discontinua"
+
+
+def test_real_csv_render(real_csv):
+    log = load_log(real_csv)
+    models, _ = render_all(log)
+    assert len(models) == 3
+    assert all(_lines(m) for m in models)
