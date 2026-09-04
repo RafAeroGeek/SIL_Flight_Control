@@ -69,3 +69,36 @@ def render_all(log: FlightLog):
     x_range = new_x_range(log)
     models = [g.render(log, source, x_range) for g in PREDEFINED]
     return models, x_range
+
+
+@dataclass(frozen=True)
+class TabGroup:
+    """Una pestana del servidor interactivo: nombre + graficas que agrupa."""
+
+    name: str
+    plot_groups: list[PlotGroup]
+
+
+def build_tab_groups() -> list[TabGroup]:
+    """Pestanas del servidor interactivo (independiente de PREDEFINED/report.py)."""
+    return [
+        TabGroup("Dinamica Longitudinal", [PlotGroup("Estados", longi_dynamics.build)]),
+        TabGroup("Control de Superficies", [PlotGroup("Comandos", control_commands.build)]),
+        TabGroup("Sensores e Inercial", [
+            PlotGroup("Airspeed", sensor_airspeed.build),
+            PlotGroup("IMU", sensor_imu.build),
+            PlotGroup("GPS", sensor_gps.build),
+            PlotGroup("Laser", sensor_laser.build),
+        ]),
+        TabGroup("Resumen", list(PREDEFINED)),
+    ]
+
+
+from flightreview.plots import (  # noqa: E402
+    control_commands,
+    longi_dynamics,
+    sensor_airspeed,
+    sensor_gps,
+    sensor_imu,
+    sensor_laser,
+)

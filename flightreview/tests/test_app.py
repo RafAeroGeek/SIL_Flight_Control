@@ -24,8 +24,10 @@ def test_cargar_ruta_valida(synthetic_csv):
     app.cargar_ruta(synthetic_csv)
     assert app._estado_doc["log"] is not None
     assert app._estado_doc["log"].n_samples == 60
-    # leyenda de modos + 3 graficas
-    assert len(app.graficas.children) == 4
+    # 4 pestanas: Dinamica, Control, Sensores, Resumen
+    assert len(app.tabs_container.tabs) == 4
+    for panel in app.tabs_container.tabs:
+        assert panel.child.children  # cada pestana: leyenda + grafica(s)
 
 
 def test_boton_export_genera_html(synthetic_csv, tmp_path, monkeypatch):

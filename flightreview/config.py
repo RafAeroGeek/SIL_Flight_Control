@@ -49,6 +49,48 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "airspeed": ["pitot_ms", "airspeed_ms", "ARSP", "pitot_airspeed_ms"],
     "gps_alt": ["gps_alt_m", "gps_alt", "alt_m"],
     "laser_alt": ["laser_alt_m", "laser_range_m", "range_m", "laser_range"],
+
+    # --- Estados longitudinales SIL (m/s) ---
+    "du": ["du_mps"],
+    "dw": ["dw_mps"],
+
+    # --- Mando del piloto (normalizado) ---
+    "pilot_roll": ["pilot_roll"],
+    "pilot_pitch": ["pilot_pitch"],
+    "pilot_yaw": ["pilot_yaw"],
+    "pilot_throttle": ["pilot_throttle"],
+
+    # --- Comandos crudos de radiocontrol (us) ---
+    "elev_cmd": ["elev_cmd_us"],
+    "ail_cmd": ["ail_cmd_us"],
+    "rud_cmd": ["rud_cmd_us"],
+    "thro_cmd": ["thro_cmd_us"],
+
+    # --- Canales RC ---
+    "rc_pitch": ["rc_pitch"],
+    "rc_roll": ["rc_roll"],
+    "rc_yaw": ["rc_yaw"],
+    "rc_throttle": ["rc_throttle"],
+    "rc_flaps": ["rc_flaps"],
+
+    # --- Salida a actuadores (us) ---
+    "u_elev": ["u_elev_us"],
+    "u_ail": ["u_ail_us"],
+    "u_rud": ["u_rud_us"],
+    "u_thro": ["u_thro_us"],
+
+    # --- Superficies/throttle resultantes ---
+    "y_elev": ["y_elev_deg"],
+    "y_ail": ["y_ail_deg"],
+    "y_rud": ["y_rud_deg"],
+    "y_thro": ["y_thro_norm"],
+
+    # --- GPS: posicion y velocidad ---
+    "gps_lat": ["gps_lat_deg"],
+    "gps_lon": ["gps_lon_deg"],
+    "gps_vn": ["gps_vn_ms"],
+    "gps_ve": ["gps_ve_ms"],
+    "gps_vd": ["gps_vd_ms"],
 }
 
 # ---------------------------------------------------------------------------

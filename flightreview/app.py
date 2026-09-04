@@ -26,11 +26,11 @@ if _ROOT not in sys.path:
 
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
-from bokeh.models import Button, Div, FileInput, TextInput
+from bokeh.models import Button, Div, FileInput, TabPanel, Tabs, TextInput
 
 from flightreview.parser.loader import load_log
-from flightreview.plots.base import mode_legend_div
-from flightreview.plots.registry import render_all
+from flightreview.plots.base import log_source, mode_legend_div, new_x_range
+from flightreview.plots.registry import build_tab_groups
 from flightreview.report import build_html
 
 # Ruta candidata para autocarga al arrancar (relativa a la raiz del repo).
@@ -46,14 +46,14 @@ ruta_input = TextInput(title="...o ruta local", placeholder=DEFAULT_LOG, width=4
 ruta_btn = Button(label="Cargar ruta", button_type="primary", width=110)
 export_btn = Button(label="Exportar reporte HTML", button_type="success", width=180)
 
-graficas = column(sizing_mode="stretch_width")
+tabs_container = Tabs(sizing_mode="stretch_width", tabs=[])
 
 root = column(
     titulo,
     row(file_input, ruta_input, ruta_btn),
     row(export_btn),
     estado,
-    graficas,
+    tabs_container,
     sizing_mode="stretch_width",
 )
 
@@ -66,8 +66,21 @@ _estado_doc: dict[str, object] = {"log": None}
 # --------------------------------------------------------------------------
 def _mostrar_log(log) -> None:
     _estado_doc["log"] = log
-    modelos, _xr = render_all(log)
-    graficas.children = [mode_legend_div(log.mode_intervals), *modelos]
+
+    source = log_source(log)
+    x_range = new_x_range(log)
+
+    panels = []
+    for tab_group in build_tab_groups():
+        figuras = [mode_legend_div(log.mode_intervals)]
+        for plot_group in tab_group.plot_groups:
+            figuras.append(plot_group.render(log, source, x_range))
+        panels.append(TabPanel(
+            child=column(*figuras, sizing_mode="stretch_width"),
+            title=tab_group.name,
+        ))
+    tabs_container.tabs = panels
+
     estado.text = (
         f"<b>{os.path.basename(log.path)}</b> &mdash; "
         f"{log.n_samples} muestras, {log.duration_s:.2f} s, "

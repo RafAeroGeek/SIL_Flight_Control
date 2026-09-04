@@ -43,6 +43,9 @@ venv/
 flightreview/reports/
 *.parquet
 
+# Datos de ejemplo comprimidos (regenerables, no se trackean en git).
+/data.zip
+
 # ---------- IDE / sistema ----------
 .kdev4/
 *.kdev4
