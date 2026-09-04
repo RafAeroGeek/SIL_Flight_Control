@@ -22,10 +22,15 @@ static const ServoCfg_s g_cfg[] =
     [SERVO_ELEVATOR] =   {0.01f,  0.18f,    0.001f,  0.0f, -25.0f,  25.0f, 900.0f},
     [SERVO_AILERON]  =   {0.01f,  0.18f,    0.001f,  0.0f, -20.0f,  20.0f, 300.0f},
     [SERVO_RUDDER]   =   {0.07f,  0.18f,    0.001f,  0.0f, -30.0f,  30.0f, 250.0f},
-    /* PROPUESTO - REVISAR: canal throttle normalizado [0,1]. No es un servo de
-       posición: la "unidad real" es fracción [0,1], pero se reutilizan los
-       campos _deg del struct tal cual. k=1 => y_ss = 1 * u con u en [0,1]. */
-    [SERVO_THROTTLE] =   {0.20f,  1.0f,     0.001f,  0.0f,   0.0f,   1.0f,   2.0f},
+    /* Canal throttle: la entrada llega en microsegundos como los demas canales
+       (Servos_SetCmdDeltaUs), centro 1500 us y recorrido +/-500 us. k = 1/500
+       mapea ese recorrido a la salida normalizada [0,1]; los campos _deg del
+       struct se reutilizan como "unidades de fraccion". No es un servo de
+       posicion sino un ESC: tau y rate_limit son PROPUESTOS - REVISAR (sin datos
+       de banco). Rangos defendibles para un ESC de aeromodelo: tau ~[0.15,0.30] s
+       (retardo empuje/RPM del conjunto ESC+motor+helice), rate ~[1.5,3.0] u/s
+       (soft-start). Los valores de abajo caen dentro de esos rangos. */
+    [SERVO_THROTTLE] =   {0.20f,  0.002f,   0.001f,  0.0f,   0.0f,   1.0f,   2.0f},
 };
 
 _Static_assert((sizeof(g_cfg) / sizeof(g_cfg[0])) == SERVO_SIM_CH_COUNT,
