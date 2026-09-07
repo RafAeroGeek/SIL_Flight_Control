@@ -83,12 +83,12 @@ static double sensors_get_u_body_ms(const FlightSim *sim)
      * Tu estado X[0] = du.
      * La velocidad total longitudinal de cuerpo es:
      *
-     * u = u0 + du
+     * u = u0_ms + du
      *
-     * En tu Params tienes p->u0 y p->V0_ms.
-     * Uso u0 si está disponible; si no, V0_ms.
+     * En tu Params tienes p->u0_ms y p->V0_ms.
+     * Uso u0_ms si está disponible; si no, V0_ms.
      */
-    double u_trim = (double)sim->params.u0;
+    double u_trim = (double)sim->params.u0_ms;
 
     if (fabs(u_trim) < 1.0e-6) {
         u_trim = (double)sim->params.V0_ms;
@@ -145,17 +145,37 @@ static double sensors_get_theta_rad(const FlightSim *sim)
 static void SensorsSim_UpdatePitot(SensorsSim *ss,
                                    const FlightSim *sim)
 {
+    /*
+     * Tu estado X[0] = du.
+     * La velocidad total Viento:
+     *
+     * V = V0 + dV
+     *                 dw
+     * dV = du + w0_ms * ------
+     *                    u0_ms
+     *
+     * Aircraft systems identification Morelli Pag.81
+     */
     if (!ss->cfg.pitot_enabled) {
         ss->data.pitot.valid = false;
         return;
     }
 
+    const double V0 = (double)sim->params.V0_ms;
+
+    const double u0 = (double)sim->params.u0_ms;
+
+    const double w0 = (double)sim->params.w0_ms;
+
+    double du = sim->X[0];
+
+    double dw = sim->X[1];
+
+    double dV = du + w0 * dw / u0;
+
     const double rho0 = 1.225;
 
-    double u = sensors_get_u_body_ms(sim);
-    double w = sensors_get_w_body_ms(sim);
-
-    double v_air = sqrt(u*u + w*w);
+    double v_air = V0 + dV ;
 
     v_air += ss->cfg.noise.pitot_bias_ms;
     v_air += sensors_noise(ss, ss->cfg.noise.pitot_noise_std_ms);
