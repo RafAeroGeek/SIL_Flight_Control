@@ -7,7 +7,7 @@ Params get_dynamic_model(DynamicModelId id)
         .name = "DEFAULT",
         .Alt_m = 0.0f, .V0_ms = 1.0f, .gamma0_deg = 0.0f, .masa_kg = 1.0f,
         .X_u = 0.0f, .X_w = 0.0f, .X_theta = 0.0f,
-        .Z_u_hat = 0.0f, .Z_w_hat = 0.0f, .u0 = 1.0f, .Z_theta = 0.0f, .Z_de = 0.0f,
+        .Z_u_hat = 0.0f, .Z_w_hat = 0.0f, .u0_ms = 1.0f, .Z_theta = 0.0f, .Z_de = 0.0f,
         .M_u_hat = 0.0f, .M_w_hat = 0.0f, .M_q_hat = 0.0f, .M_de = 0.0f,
         .L_da = 0.0f, .L_p = 0.0f, .delta_a_trim_deg = 0.0f, .delta_e_trim_deg = 0.0f,
         .delta_r_trim_deg = 0.0f, .delta_thr_trim = 0.0f
@@ -27,7 +27,8 @@ Params get_dynamic_model(DynamicModelId id)
             .X_theta    = -9.724f,
             .Z_u_hat    = -0.5484f,
             .Z_w_hat    = -2.557f,
-            .u0         = 35.6997f,
+            .u0_ms      = 35.6997f,
+            .w0_ms      = 4.71f,
             .Z_theta    = 1.2963f,
             .Z_de       = 7.1336f,
             .M_u_hat    = 0.0213f,

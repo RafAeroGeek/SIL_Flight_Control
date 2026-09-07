@@ -23,7 +23,8 @@ typedef struct {
 
     float Z_u_hat;
     float Z_w_hat;
-    float u0;
+    float u0_ms;
+    float w0_ms;
     float Z_theta;
     float Z_de;
 
@@ -66,7 +67,7 @@ double doublet_signal(double tiempo, double t0, double amplitud, double duracion
 // Señal de rafaga
 double gust_signal(double tiempo, double t0, double amplitud, double frequencia_hz);
 
-// Utilidad: ángulo de ataque (rad) con atan2(w, u0 + du)
+// Utilidad: ángulo de ataque (rad) con atan2(w, u0_ms + du)
 double compute_alpha(const Params *p, double du, double dw);
 
 // saturacion de señales
