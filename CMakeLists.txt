@@ -22,7 +22,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_executable(SIL_Flight_Control
     src/main.c
     src/dynamics.c
-    src/dynamic_models.c
+    src/aircraft_loader.c
     src/flight_management.c
     src/flight_sim.c
     src/pilot_sim.c

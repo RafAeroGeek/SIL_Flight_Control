@@ -4,7 +4,7 @@
 
 
 #include "sim_settings.h"
-#include "dynamic_models.h"
+#include "aircraft_loader.h"
 #include "dynamics.h"
 #include "flight_sim.h"
 #include "sim_PWM_processing.h"
@@ -59,8 +59,10 @@ void task_init_1ms(void)
 {
     //
 
-     /* 1) Cargar modelo */
-    g_params = get_dynamic_model(DYN_MODEL_SS_V1);
+     /* 1) Cargar modelo
+      * Errores de carga ya quedan logueados dentro de Aircraft_LoadParams
+      * (rama PC); si falla, g_params queda en los valores por defecto seguros. */
+    (void)Aircraft_LoadParams(AIRCRAFT_JSON_PATH, &g_params);
 
     /* 2) Inicializar planta (t, X, H, deltas, etc.) */
     FlightSimInit ic = {0};
