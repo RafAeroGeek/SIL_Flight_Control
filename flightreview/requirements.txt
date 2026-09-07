@@ -1,0 +1,9 @@
+# flightreview - dependencias
+# Ya presentes en el entorno Anaconda del proyecto; se listan para instalaciones limpias.
+bokeh>=3.8
+pandas>=2.0
+numpy>=1.24
+pyarrow>=10        # cache en parquet (opcional en runtime; si falta se degrada)
+
+# Desarrollo
+pytest>=7

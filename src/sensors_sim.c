@@ -150,7 +150,7 @@ static void SensorsSim_UpdatePitot(SensorsSim *ss,
      * La velocidad total Viento:
      *
      * V = V0 + dV
-     *                 dw
+     *                     dw
      * dV = du + w0_ms * ------
      *                    u0_ms
      *

@@ -25,6 +25,11 @@
 #define 	SYSTEM_SIM_ENV		SIM_PLATFORM_PC			/// Sistema seleccionado
 #define 	AIRCRAFT_SIM		Coro_sim	/// Tipo de aeronave seleccionada
 
+/* Ruta del JSON de la aeronave activa, relativa al directorio de trabajo
+   (misma convencion que csv_path en main.c: correr siempre desde la raiz
+   del repo). Para cambiar de aeronave: edita este string y recompila. */
+#define 	AIRCRAFT_JSON_PATH	"aircraft/ss_v1.json"
+
 /* Rutina de piloto activa (enum RoutineID en pilot_sim.h).
    ROUTINE_LONGITUDINAL = rutina de regresion; ROUTINE_LAT_DIR ejercita yaw y throttle. */
 #define 	SIM_PILOT_ROUTINE	ROUTINE_LONGITUDINAL

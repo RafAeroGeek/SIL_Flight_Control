@@ -35,6 +35,16 @@ __pycache__/
 .spyproject/
 .venv/
 venv/
+.pytest_cache/
+*.egg-info/
+
+# ---------- flightreview (visor de logs) ----------
+# Reportes HTML generados y cache de parseo en parquet.
+flightreview/reports/
+*.parquet
+
+# Datos de ejemplo comprimidos (regenerables, no se trackean en git).
+/data.zip
 
 # ---------- IDE / sistema ----------
 .kdev4/
