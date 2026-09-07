@@ -25,6 +25,14 @@
 #define 	SYSTEM_SIM_ENV		SIM_PLATFORM_PC			/// Sistema seleccionado
 #define 	AIRCRAFT_SIM		Coro_sim	/// Tipo de aeronave seleccionada
 
+/* Rutina de piloto activa (enum RoutineID en pilot_sim.h).
+   ROUTINE_LONGITUDINAL = rutina de regresion; ROUTINE_LAT_DIR ejercita yaw y throttle. */
+#define 	SIM_PILOT_ROUTINE	ROUTINE_LONGITUDINAL
+
+/* Ganancia stick normalizado ([-1,1] ejes, [0,1] throttle) -> delta PWM [us].
+   El piloto emite valores normalizados; main.c los convierte a us antes de los servos. */
+#define 	RC_STICK_TO_US		500.0f
+
 /********************************************/
 /*------------------------------------------*/
 

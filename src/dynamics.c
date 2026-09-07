@@ -11,7 +11,7 @@ void build_state_space_matrices(const Params *p, double A[4][4], double B[4])
 {
     // Matriz A
     A[0][0] = p->X_u;      A[0][1] = p->X_w;      A[0][2] = 0.0;       A[0][3] = p->X_theta;
-    A[1][0] = p->Z_u_hat;  A[1][1] = p->Z_w_hat;  A[1][2] = p->u0;     A[1][3] = p->Z_theta;
+    A[1][0] = p->Z_u_hat;  A[1][1] = p->Z_w_hat;  A[1][2] = p->u0_ms;  A[1][3] = p->Z_theta;
     A[2][0] = p->M_u_hat;  A[2][1] = p->M_w_hat;  A[2][2] = p->M_q_hat;A[2][3] = 0.0;
     A[3][0] = 0.0;         A[3][1] = 0.0;         A[3][2] = 1.0;       A[3][3] = 0.0;
 
@@ -103,7 +103,7 @@ double gust_signal(double tiempo, double t0, double amplitud, double frequencia_
 
 double compute_alpha(const Params *p, double du, double dw)
 {
-    return atan2(dw, p->u0 + du);
+    return atan2(dw, p->u0_ms + du);
 }
 
 double saturacion(double dato, double sat_min, double sat_max)

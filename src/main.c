@@ -232,15 +232,16 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
      /* Comandos ejemplo (delta PWM us respecto a 1500) */
 
-     pilot = pilot_source_commands(now_ms, 1);
+     pilot = pilot_source_commands(now_ms, SIM_PILOT_ROUTINE);
 
      rc_sim = rc_source(pilot);
 
      /* Comandos para cada servo basados en los canales RC */
-     float aile_cmd = rc_sim.s[RC_CH_ROLL];      // Canal 0: Roll -> Aileron
-     float elev_cmd = rc_sim.s[RC_CH_PITCH];     // Canal 1: Pitch -> Elevator
-     float rud_cmd  = rc_sim.s[RC_CH_YAW];       // Canal 2: Yaw -> Rudder
-     float thro_cmd = rc_sim.s[RC_CH_THROTTLE];  // Canal 3: Throttle
+     /* Canales RC en unidades normalizadas -> delta PWM [us] (RC_STICK_TO_US) */
+     float aile_cmd = rc_sim.s[RC_CH_ROLL]     * RC_STICK_TO_US;  // Canal 0: Roll -> Aileron
+     float elev_cmd = rc_sim.s[RC_CH_PITCH]    * RC_STICK_TO_US;  // Canal 1: Pitch -> Elevator
+     float rud_cmd  = rc_sim.s[RC_CH_YAW]      * RC_STICK_TO_US;  // Canal 2: Yaw -> Rudder
+     float thro_cmd = rc_sim.s[RC_CH_THROTTLE] * RC_STICK_TO_US;  // Canal 3: Throttle
 
      /* Opcional: flaps, modo, armado */
      float flaps_cmd    = rc_sim.s[RC_CH_FLAPS];
