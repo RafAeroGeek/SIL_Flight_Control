@@ -124,8 +124,13 @@ void task_init_1ms(void)
 
     FlightSim_Actuators_init(&g_act, &g_params);
 
-    /* 3) Servos */
-    Servos_Init_All();
+    /* 3) Servos: base = tabla compilada; overrides opcionales del JSON de la
+       aeronave (dt_s se mantiene en el default: es del arnes SIL, no del
+       airframe). Si el JSON no trae claves servo_*, quedan los defaults. */
+    ServoCfg_s servo_cfg[SERVO_SIM_N_SERVOS];
+    Servos_GetDefaultCfg(servo_cfg);
+    (void)Aircraft_LoadServoCfg(AIRCRAFT_JSON_PATH, servo_cfg);
+    Servos_Init_All_Cfg(servo_cfg);
 
     #if(SYSTEM_SIM_ENV == SIM_PLATFORM_PC)
         /* 4) (Opcional) imprimir A,B desde el sim */

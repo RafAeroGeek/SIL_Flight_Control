@@ -1,25 +1,25 @@
 {
-    "name": "SS_v1",
+    "name": "ugly_stick",
     "Alt_m": 1000.0,
-    "V0_ms": 36.0,
-    "gamma0_deg": -15.0,
-    "masa_kg": 4.7,
+    "V0_ms": 25.25,
+    "u0_ms": 25.22,
+    "w0_ms": 1.32,
+    "gamma0_deg": 3.0,
+    "masa_kg": 20,
 
-    "X_u": -0.0498,
-    "X_w": -0.0169,
-    "X_theta": -9.724,
+    "X_u": -0.05307,
+    "X_w": 0.1780,
+    "X_theta": -9.7,
 
-    "Z_u_hat": -0.5484,
-    "Z_w_hat": -2.557,
-    "u0_ms": 35.6997,
-    "w0_ms": 4.71,
-    "Z_theta": 1.2963,
-    "Z_de": 7.1336,
+    "Z_u_hat": -0.7734,
+    "Z_w_hat": -2.3706,
+    "Z_theta": -1.4281,
+    "Z_de": -6.320,
 
-    "M_u_hat": 0.0213,
-    "M_w_hat": -7.8773,
-    "M_q_hat": -2.6347,
-    "M_de": -64.202,
+    "M_u_hat": 0.0905,
+    "M_w_hat": -0.6450,
+    "M_q_hat": -6.5739,
+    "M_de": -48.92,
 
     "L_da": 4.66,
     "L_p": -1.30,
@@ -27,7 +27,6 @@
     "delta_a_trim_deg": 0.0,
     "delta_e_trim_deg": 0.0,
     "delta_r_trim_deg": 0.0,
-<<<<<<< HEAD
     "delta_thr_trim": 0.0,
 
     "servo_elevator_tau_s": 0.01,
@@ -57,7 +56,4 @@
     "servo_throttle_y_min_deg": 0.0,
     "servo_throttle_y_max_deg": 1.0,
     "servo_throttle_rate_limit_dps": 2.0
-=======
-    "delta_thr_trim": 0.0
->>>>>>> origin/main
 }

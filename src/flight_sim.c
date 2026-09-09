@@ -1,7 +1,12 @@
+#define _DEFAULT_SOURCE  /* Para M_PI en Linux/POSIX */
+
 #include <stdio.h>  // Para printf
 #include "flight_sim.h"
 
 #include <string.h>
+#include <math.h>
+
+#define DEG_TO_RAD(deg) ((deg) * M_PI / 180.0)
 
 /* Helper local */
 static void copy4(double dst[4], const double src[4])
@@ -112,9 +117,9 @@ void FlightSim_SetActuatorsFromFM(FlightSim *sim, const FM_Actuators *act)
 
     /* Aquí tú defines tu convención:
        si act->elevator es [-1,1] conviértelo a rad o a delta_e físico. */
-    sim->delta_elv = (double)act->elevator;
-    sim->delta_ail = (double)act->aileron;
-    sim->delta_rud = (double)act->rudder;
+    sim->delta_elv = (double)DEG_TO_RAD(act->elevator);
+    sim->delta_ail = (double)DEG_TO_RAD(act->aileron);
+    sim->delta_rud = (double)DEG_TO_RAD(act->rudder);
     sim->throttle  = (double)act->throttle;
 }
 

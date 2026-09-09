@@ -42,3 +42,39 @@ target_link_libraries(SIL_Flight_Control PRIVATE m)
 
 # El programa escribe en "data/SIL_sim_servos2.csv", ruta relativa al
 # directorio de trabajo. Ejecutar siempre desde la raiz del proyecto.
+
+# ---------------------------------------------------------------------------
+# Tests unitarios en C (opt-in). El build por defecto NO cambia.
+#   cmake -S . -B build -DSIL_BUILD_TESTS=ON
+#   ctest --test-dir build --output-on-failure
+# ---------------------------------------------------------------------------
+option(SIL_BUILD_TESTS "Compilar los tests unitarios en C" OFF)
+
+if(SIL_BUILD_TESTS)
+    enable_testing()
+
+    add_executable(test_servo_cfg
+        test/test_servo_cfg.c
+        src/servo_sim.c
+        src/dynamics.c
+    )
+    target_include_directories(test_servo_cfg PRIVATE src test)
+    target_compile_options(test_servo_cfg PRIVATE -Wall)
+    target_link_libraries(test_servo_cfg PRIVATE m)
+    add_test(NAME test_servo_cfg COMMAND test_servo_cfg)
+
+    add_executable(test_aircraft_loader_servo
+        test/test_aircraft_loader_servo.c
+        src/aircraft_loader.c
+        src/servo_sim.c
+        src/dynamics.c
+    )
+    target_include_directories(test_aircraft_loader_servo PRIVATE src test)
+    target_compile_options(test_aircraft_loader_servo PRIVATE -Wall)
+    target_link_libraries(test_aircraft_loader_servo PRIVATE m)
+    target_compile_definitions(test_aircraft_loader_servo PRIVATE
+        AIRCRAFT_JSON_REAL="${CMAKE_SOURCE_DIR}/aircraft/ss_v1.json"
+        TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}"
+    )
+    add_test(NAME test_aircraft_loader_servo COMMAND test_aircraft_loader_servo)
+endif()

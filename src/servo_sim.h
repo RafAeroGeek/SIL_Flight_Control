@@ -81,6 +81,14 @@ float Servo_Update(Servo_s *s, float u_delta_us);
 /* Inicializa todos los servos usando la tabla interna de config */
 void Servos_Init_All(void);
 
+/* Igual que Servos_Init_All pero tomando la config desde un arreglo externo
+   (p.ej. rellenado desde el JSON de la aeronave). Si cfg == NULL cae a g_cfg[]. */
+void Servos_Init_All_Cfg(const ServoCfg_s cfg[SERVO_SIM_N_SERVOS]);
+
+/* Copia la tabla de config por defecto (compilada) al arreglo del usuario,
+   base para superponer overrides del JSON. */
+void Servos_GetDefaultCfg(ServoCfg_s out[SERVO_SIM_N_SERVOS]);
+
 /* Set del comando por servo (delta PWM en microsegundos) */
 void Servos_SetCmdDeltaUs(unsigned idx, float u_delta_us);
 

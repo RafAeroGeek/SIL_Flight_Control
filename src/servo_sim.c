@@ -141,21 +141,38 @@ float Servo_Update(Servo_s *s, float u_delta_us)
 
 /* ===================== MULTI-SERVO API ===================== */
 
-void Servos_Init_All(void)
+void Servos_Init_All_Cfg(const ServoCfg_s cfg[SERVO_SIM_N_SERVOS])
 {
+    const ServoCfg_s *src = (cfg != NULL) ? cfg : g_cfg;
+
     for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i)
     {
         Servo_Init(&g_servos[i],
-                   g_cfg[i].tau_s,
-                   g_cfg[i].k_deg_per_us,
-                   g_cfg[i].dt_s,
-                   g_cfg[i].y0_deg,
-                   g_cfg[i].y_min_deg,
-                   g_cfg[i].y_max_deg,
-                   g_cfg[i].rate_limit_dps);
+                   src[i].tau_s,
+                   src[i].k_deg_per_us,
+                   src[i].dt_s,
+                   src[i].y0_deg,
+                   src[i].y_min_deg,
+                   src[i].y_max_deg,
+                   src[i].rate_limit_dps);
 
         g_u_delta_us[i] = 0.0f;
         g_y_out_deg[i]  = g_servos[i].y_deg;
+    }
+}
+
+void Servos_Init_All(void)
+{
+    Servos_Init_All_Cfg(g_cfg);
+}
+
+void Servos_GetDefaultCfg(ServoCfg_s out[SERVO_SIM_N_SERVOS])
+{
+    if (out == NULL) return;
+
+    for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i)
+    {
+        out[i] = g_cfg[i];   /* asignacion de struct: evita <string.h> aqui */
     }
 }
 

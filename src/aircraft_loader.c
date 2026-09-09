@@ -161,6 +161,83 @@ bool Aircraft_LoadParams(const char *json_path, Params *out)
     return true;
 }
 
+<<<<<<< HEAD
+typedef struct {
+    const char *key;
+    unsigned    servo_idx;   /* ServoChannel_e */
+    size_t      offset;      /* offsetof(ServoCfg_s, campo) */
+} ServoField;
+
+/* Fuente unica de verdad clave-json <-> (canal, campo) de ServoCfg_s.
+ * dt_s se omite a proposito: es del arnes SIL (paso == tick del scheduler),
+ * no del airframe; se queda en el default compilado de servo_sim.c. */
+static const ServoField kServoFields[] = {
+    { "servo_elevator_tau_s",          SERVO_ELEVATOR, offsetof(ServoCfg_s, tau_s)          },
+    { "servo_elevator_k_deg_per_us",   SERVO_ELEVATOR, offsetof(ServoCfg_s, k_deg_per_us)   },
+    { "servo_elevator_y0_deg",         SERVO_ELEVATOR, offsetof(ServoCfg_s, y0_deg)         },
+    { "servo_elevator_y_min_deg",      SERVO_ELEVATOR, offsetof(ServoCfg_s, y_min_deg)      },
+    { "servo_elevator_y_max_deg",      SERVO_ELEVATOR, offsetof(ServoCfg_s, y_max_deg)      },
+    { "servo_elevator_rate_limit_dps", SERVO_ELEVATOR, offsetof(ServoCfg_s, rate_limit_dps) },
+
+    { "servo_aileron_tau_s",           SERVO_AILERON,  offsetof(ServoCfg_s, tau_s)          },
+    { "servo_aileron_k_deg_per_us",    SERVO_AILERON,  offsetof(ServoCfg_s, k_deg_per_us)   },
+    { "servo_aileron_y0_deg",          SERVO_AILERON,  offsetof(ServoCfg_s, y0_deg)         },
+    { "servo_aileron_y_min_deg",       SERVO_AILERON,  offsetof(ServoCfg_s, y_min_deg)      },
+    { "servo_aileron_y_max_deg",       SERVO_AILERON,  offsetof(ServoCfg_s, y_max_deg)      },
+    { "servo_aileron_rate_limit_dps",  SERVO_AILERON,  offsetof(ServoCfg_s, rate_limit_dps) },
+
+    { "servo_rudder_tau_s",            SERVO_RUDDER,   offsetof(ServoCfg_s, tau_s)          },
+    { "servo_rudder_k_deg_per_us",     SERVO_RUDDER,   offsetof(ServoCfg_s, k_deg_per_us)   },
+    { "servo_rudder_y0_deg",           SERVO_RUDDER,   offsetof(ServoCfg_s, y0_deg)         },
+    { "servo_rudder_y_min_deg",        SERVO_RUDDER,   offsetof(ServoCfg_s, y_min_deg)      },
+    { "servo_rudder_y_max_deg",        SERVO_RUDDER,   offsetof(ServoCfg_s, y_max_deg)      },
+    { "servo_rudder_rate_limit_dps",   SERVO_RUDDER,   offsetof(ServoCfg_s, rate_limit_dps) },
+
+    { "servo_throttle_tau_s",          SERVO_THROTTLE, offsetof(ServoCfg_s, tau_s)          },
+    { "servo_throttle_k_deg_per_us",   SERVO_THROTTLE, offsetof(ServoCfg_s, k_deg_per_us)   },
+    { "servo_throttle_y0_deg",         SERVO_THROTTLE, offsetof(ServoCfg_s, y0_deg)         },
+    { "servo_throttle_y_min_deg",      SERVO_THROTTLE, offsetof(ServoCfg_s, y_min_deg)      },
+    { "servo_throttle_y_max_deg",      SERVO_THROTTLE, offsetof(ServoCfg_s, y_max_deg)      },
+    { "servo_throttle_rate_limit_dps", SERVO_THROTTLE, offsetof(ServoCfg_s, rate_limit_dps) },
+};
+
+#define AIRCRAFT_NUM_SERVO_FIELDS (sizeof(kServoFields) / sizeof(kServoFields[0]))
+
+bool Aircraft_LoadServoCfg(const char *json_path, ServoCfg_s out[SERVO_SIM_N_SERVOS])
+{
+    if (out == NULL) {
+        return false;
+    }
+
+    FILE *fp = fopen(json_path, "r");
+    if (fp == NULL) {
+        perror("Aircraft_LoadServoCfg: fopen");
+        return false;
+    }
+
+    char buf[AIRCRAFT_JSON_BUF_SIZE];
+    size_t n = fread(buf, 1u, sizeof(buf) - 1u, fp);
+    fclose(fp);
+    buf[n] = '\0';
+
+    if (n == 0u) {
+        fprintf(stderr, "Aircraft_LoadServoCfg: %s esta vacio\n", json_path);
+        return false;
+    }
+
+    for (size_t i = 0; i < AIRCRAFT_NUM_SERVO_FIELDS; i++) {
+        float value;
+        if (find_number(buf, kServoFields[i].key, &value)) {
+            ServoCfg_s *row = &out[kServoFields[i].servo_idx];
+            *(float *)((char *)row + kServoFields[i].offset) = value;
+        }
+    }
+
+    return true;
+}
+
+=======
+>>>>>>> origin/main
 #else /* SYSTEM_SIM_ENV == SIM_PLATFORM_RTOS (u otra): sin filesystem garantizado */
 
 bool Aircraft_LoadParams(const char *json_path, Params *out)
@@ -170,4 +247,14 @@ bool Aircraft_LoadParams(const char *json_path, Params *out)
     return false;
 }
 
+<<<<<<< HEAD
+bool Aircraft_LoadServoCfg(const char *json_path, ServoCfg_s out[SERVO_SIM_N_SERVOS])
+{
+    (void)json_path;
+    (void)out;               /* out[] se queda con los defaults del llamador */
+    return false;
+}
+
+=======
+>>>>>>> origin/main
 #endif

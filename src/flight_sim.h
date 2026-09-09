@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+
 #include "dynamics.h"          // Params, build_state_space_matrices, rk4_step (si aplica)
 #include "flight_management.h" // FM_Actuators (opcional, si quieres usarlo aquí)
 

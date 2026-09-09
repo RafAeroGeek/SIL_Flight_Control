@@ -3,6 +3,10 @@
 
 #include <stdbool.h>
 #include "dynamics.h"
+<<<<<<< HEAD
+#include "servo_sim.h"   /* ServoCfg_s, SERVO_SIM_N_SERVOS, ServoChannel_e */
+=======
+>>>>>>> origin/main
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,6 +25,25 @@ extern "C" {
  */
 bool Aircraft_LoadParams(const char *json_path, Params *out);
 
+<<<<<<< HEAD
+/* Superpone la config de servos leida de un JSON plano por-aeronave sobre un
+ * arreglo que el llamador YA relleno con los defaults compilados (via
+ * Servos_GetDefaultCfg). Solo se sobreescriben los campos cuya clave
+ * "servo_<canal>_<campo>" aparece en el archivo. dt_s NUNCA se toca: es un
+ * parametro del arnes SIL (paso de integracion == tick del scheduler), no del
+ * airframe.
+ *
+ * A diferencia de Aircraft_LoadParams, NO resetea out[] a un default interno:
+ * los defaults de servo son propiedad de servo_sim.c (g_cfg) y duplicarlos aqui
+ * seria una segunda fuente de verdad sin proteccion de _Static_assert. En
+ * cualquier fallo (archivo faltante/vacio, plataforma RTOS) out[] queda intacto
+ * y se devuelve false.
+ */
+bool Aircraft_LoadServoCfg(const char *json_path,
+                           ServoCfg_s out[SERVO_SIM_N_SERVOS]);
+
+=======
+>>>>>>> origin/main
 #ifdef __cplusplus
 }
 #endif

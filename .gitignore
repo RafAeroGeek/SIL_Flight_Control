@@ -1,6 +1,7 @@
 # ---------- Compilacion (CMake / KDevelop) ----------
 build/
 build-*/
+build_tests/
 cmake-build-*/
 CMakeCache.txt
 CMakeFiles/
