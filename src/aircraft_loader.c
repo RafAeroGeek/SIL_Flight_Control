@@ -161,7 +161,6 @@ bool Aircraft_LoadParams(const char *json_path, Params *out)
     return true;
 }
 
-<<<<<<< HEAD
 typedef struct {
     const char *key;
     unsigned    servo_idx;   /* ServoChannel_e */
@@ -236,8 +235,6 @@ bool Aircraft_LoadServoCfg(const char *json_path, ServoCfg_s out[SERVO_SIM_N_SER
     return true;
 }
 
-=======
->>>>>>> origin/main
 #else /* SYSTEM_SIM_ENV == SIM_PLATFORM_RTOS (u otra): sin filesystem garantizado */
 
 bool Aircraft_LoadParams(const char *json_path, Params *out)
@@ -247,7 +244,6 @@ bool Aircraft_LoadParams(const char *json_path, Params *out)
     return false;
 }
 
-<<<<<<< HEAD
 bool Aircraft_LoadServoCfg(const char *json_path, ServoCfg_s out[SERVO_SIM_N_SERVOS])
 {
     (void)json_path;
@@ -255,6 +251,4 @@ bool Aircraft_LoadServoCfg(const char *json_path, ServoCfg_s out[SERVO_SIM_N_SER
     return false;
 }
 
-=======
->>>>>>> origin/main
 #endif

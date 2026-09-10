@@ -3,10 +3,7 @@
 
 #include <stdbool.h>
 #include "dynamics.h"
-<<<<<<< HEAD
 #include "servo_sim.h"   /* ServoCfg_s, SERVO_SIM_N_SERVOS, ServoChannel_e */
-=======
->>>>>>> origin/main
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +22,6 @@ extern "C" {
  */
 bool Aircraft_LoadParams(const char *json_path, Params *out);
 
-<<<<<<< HEAD
 /* Superpone la config de servos leida de un JSON plano por-aeronave sobre un
  * arreglo que el llamador YA relleno con los defaults compilados (via
  * Servos_GetDefaultCfg). Solo se sobreescriben los campos cuya clave
@@ -42,8 +38,6 @@ bool Aircraft_LoadParams(const char *json_path, Params *out);
 bool Aircraft_LoadServoCfg(const char *json_path,
                            ServoCfg_s out[SERVO_SIM_N_SERVOS]);
 
-=======
->>>>>>> origin/main
 #ifdef __cplusplus
 }
 #endif
