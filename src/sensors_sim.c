@@ -200,13 +200,14 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
     double w = sensors_get_w_body_ms(sim);
     double q = sensors_get_q_radps(sim);
     double theta = sensors_get_theta_rad(sim);
+    double phi = 0.0 ; // TODO cambiar en la implemantacion de lateral - direccional.
 
-    double du_dt = 0.0;
-    double dw_dt = 0.0;
+    double du_dot = 0.0;
+    double dw_dot = 0.0;
 
     if (ss->prev_valid && dt_s > 0.0) {
-        du_dt = (u - ss->prev_u_ms) / dt_s;
-        dw_dt = (w - ss->prev_w_ms) / dt_s;
+        du_dot = (u - ss->prev_u_ms) / dt_s;
+        dw_dot = (w - ss->prev_w_ms) / dt_s;
     }
 
     /*
@@ -218,14 +219,15 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
      *
      * Más adelante podemos reemplazar esto por:
      *
-     * f_x = u_dot + q*w + g*sin(theta)
-     * f_z = w_dot - q*u - g*cos(theta)
+     * a_x = u_dot + q*w + g*sin(theta)
+     * a_y = v_dot - p*w + r*u - g*cos(theta)*sin(phi)
+     * a_z = w_dot - q*u - g*cos(theta)
      *
      * según convención de ejes.
      */
-    double ax = du_dt;
+    double ax = du_dot + q * w + 9.81 * sin(theta);
     double ay = 0.0;
-    double az = dw_dt;
+    double az = dw_dot - q * u - 9.81 * cos(theta) * sin(phi);
 
     /* Gyro */
     double gx = 0.0;
