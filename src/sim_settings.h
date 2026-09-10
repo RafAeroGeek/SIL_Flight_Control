@@ -28,11 +28,8 @@
 /* Ruta del JSON de la aeronave activa, relativa al directorio de trabajo
    (misma convencion que csv_path en main.c: correr siempre desde la raiz
    del repo). Para cambiar de aeronave: edita este string y recompila. */
-<<<<<<< HEAD
 #define 	AIRCRAFT_JSON_PATH	"aircraft/ugly_stick.json"
-=======
-#define 	AIRCRAFT_JSON_PATH	"aircraft/ss_v1.json"
->>>>>>> origin/main
+
 
 /* Rutina de piloto activa (enum RoutineID en pilot_sim.h).
    ROUTINE_LONGITUDINAL = rutina de regresion; ROUTINE_LAT_DIR ejercita yaw y throttle. */
