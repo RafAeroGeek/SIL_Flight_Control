@@ -113,6 +113,17 @@ typedef struct
 {
     bool valid;
 
+    double AngleOfAttack_deg;
+    double SideSlipAngle_deg;
+
+} SensorVane;
+
+
+
+typedef struct
+{
+    bool valid;
+
     SensorVec3 gyro_radps;
     SensorVec3 accel_mps2;
 
@@ -149,6 +160,7 @@ typedef struct
     double t_s;
 
     SensorPitotData    pitot;
+    SensorVane         vane;
     SensorImuData      imu;
     SensorGpsData      gps;
     SensorLaserAltData laser;
