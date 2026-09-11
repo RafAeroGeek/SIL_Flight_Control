@@ -47,6 +47,10 @@ FIELD_ALIASES: dict[str, list[str]] = {
 
     # --- Extras utiles (no usados por el MVP, pero el parser los resuelve) ---
     "airspeed": ["pitot_ms", "airspeed_ms", "ARSP", "pitot_airspeed_ms"],
+
+    # --- Sensor de veleta (deg) ---
+    "aoa": ["AngleOfAttack_deg", "AoA_deg", "aoa_deg", "alpha_deg"],
+    "sideslip": ["SideSlipAngle_deg", "SSA_deg", "sideslip_deg", "beta_deg"],
     "gps_alt": ["gps_alt_m", "gps_alt", "alt_m"],
     "laser_alt": ["laser_alt_m", "laser_range_m", "range_m", "laser_range"],
 

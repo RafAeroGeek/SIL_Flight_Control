@@ -86,6 +86,7 @@ def build_tab_groups() -> list[TabGroup]:
         TabGroup("Control de Superficies", [PlotGroup("Comandos", control_commands.build)]),
         TabGroup("Sensores e Inercial", [
             PlotGroup("Airspeed", sensor_airspeed.build),
+            PlotGroup("Veleta", sensor_vane.build),
             PlotGroup("IMU", sensor_imu.build),
             PlotGroup("GPS", sensor_gps.build),
             PlotGroup("Laser", sensor_laser.build),
@@ -101,4 +102,5 @@ from flightreview.plots import (  # noqa: E402
     sensor_gps,
     sensor_imu,
     sensor_laser,
+    sensor_vane,
 )
