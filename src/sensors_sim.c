@@ -187,6 +187,40 @@ static void SensorsSim_UpdatePitot(SensorsSim *ss,
     ss->data.pitot.dynamic_pressure_pa = 0.5 * rho0 * v_air * v_air;
 }
 
+static void SensorSim_UpdateVanes(SensorsSim *ss,
+                                   const FlightSim *sim)
+{
+       /*
+     * Tu estado X[0] = du.
+     * La velocidad total Viento:
+     *
+     * u = u0 + du
+     * w = w0 + dw       _    _
+     *                -1|  w   |
+     *   dalpha = tan   |------|
+     *                  |_ u  _|
+     *
+     *
+     * Aircraft systems identification Morelli Pag.50
+     */
+    const double u0 = (double)sim->params.u0_ms;
+
+    const double w0 = (double)sim->params.w0_ms;
+
+    double u = u0 + sim->X[0];  // u0 + du
+    double w = w0 + sim->X[1];  // w0 + dw
+
+    // Validación de singularidad
+    if (fabs(u) < 0.1) {
+        ss->data.vane.valid = false;
+        return;
+    }
+
+    double alpha_rad = atan2(w, u);
+    ss->data.vane.AngleOfAttack_deg = alpha_rad * 57.29577951308;  // rad to deg
+    ss->data.vane.valid = true;
+}
+
 static void SensorsSim_UpdateImu(SensorsSim *ss,
                                  const FlightSim *sim,
                                  double dt_s)
@@ -419,7 +453,9 @@ void SensorsSim_Update(SensorsSim *ss,
 
     ss->data.t_s = sim->t_s;
 
+    // TODO calcular SideSlipAngle_deg en SensorSim_UpdateVanes (queda en 0.0 por ahora)
     SensorsSim_UpdatePitot(ss, sim);
+    SensorSim_UpdateVanes(ss, sim);
     SensorsSim_UpdateImu(ss, sim, dt_s);
     SensorsSim_UpdateGps(ss, sim, dt_s);
     SensorsSim_UpdateLaser(ss);

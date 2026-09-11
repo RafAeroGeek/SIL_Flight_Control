@@ -152,7 +152,7 @@ void task_init_1ms(void)
                          "pilot_roll,pilot_pitch,pilot_yaw,pilot_throttle," // comandos originales
                          "mode,arm,"                                         // modos
                          "du_mps,dw_mps,dq_radps,dtheta_rad,"            // Estado longitudinal
-                        "pitot_ms,"                                         // arsp
+                        "pitot_ms,AoA_deg,SSA_deg,"                                         // arsp, AoA, SideSlip
                         "gyro_x_radps,gyro_y_radps,gyro_z_radps,"           // giros
                         "acc_x_mps2,acc_y_mps2,acc_z_mps2,"                 // aceleraciones
                         "gps_lat_deg,gps_lon_deg,gps_alt_m,"                // GPS data
@@ -307,7 +307,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.3f,%.3f,%.3f,%.3f,"   // pilot_roll, pilot_pitch, pilot_yaw, pilot_throttle
                     "%.0f,%.0f,"             // mode, arm
                     "%.6f,%.6f,%.6f,%.6f,"  // du, dw, dq, dtheta
-                    "%.6f,"                 // ARSP
+                    "%.6f,%.6f,%.6f,"       // ARSP, AoA, SideSlip
                     "%.3f,%.3f,%.3f,"       // giros
                     "%.3f,%.3f,%.3f,"       // acelerometros
                     "%.3f,%.3f,%.3f,"       // gps data
@@ -331,6 +331,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     (double)du,(double)dw,(double)dq,(double)dtheta ,      // du, dw, dq, dtheta
 
                     (double)g_sens_data.pitot.airspeed_ms,                  // ARSP
+                    (double)g_sens_data.vane.AngleOfAttack_deg,
+                    (double)g_sens_data.vane.SideSlipAngle_deg,
 
                     (double)g_sens_data.imu.gyro_radps.x,                   // giros
                     (double)g_sens_data.imu.gyro_radps.y,
