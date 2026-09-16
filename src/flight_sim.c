@@ -46,7 +46,7 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
     const FlightSimInit *cfg = ic ? ic : &def;
 
     sim->t_s = cfg->t0_s;
-    copy4(sim->X, cfg->X0);
+    copy4(sim->X_lon, cfg->X0);
     sim->H_m = cfg->H0_m;
 
     sim->delta_elv = cfg->delta_elv0;
@@ -61,7 +61,7 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
     sim->p_next = 0.0;
 
     if (cfg->build_ss_matrices) {
-        build_state_space_matrices(&sim->params, sim->A, sim->B);
+        build_state_space_matrices(&sim->params, sim->A_lon, sim->B_lon);
     }
 }
 
@@ -146,8 +146,8 @@ void FlightSim_Step(FlightSim *sim, double dt_s)
     if (!sim || !sim->initialized) return;
     if (dt_s <= 0.0) return;
 
-    rk4_step(longitudinal_dynamics, sim->X, sim->delta_elv, dt_s, sim->A , sim->B, sim->Xn);
-    copy4(sim->X, sim->Xn);
+    rk4_step(longitudinal_dynamics, sim->X_lon, sim->delta_elv, dt_s, sim->A_lon , sim->B_lon, sim->Xn_lon);
+    copy4(sim->X_lon, sim->Xn_lon);
 
     sim->t_s += dt_s;
 }
@@ -161,5 +161,5 @@ double FlightSim_GetTime(const FlightSim *sim)
 void FlightSim_GetX(const FlightSim *sim, double out_X4[4])
 {
     if (!sim || !out_X4) return;
-    copy4(out_X4, sim->X);
+    copy4(out_X4, sim->X_lon);
 }

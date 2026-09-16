@@ -21,8 +21,8 @@ typedef struct
     double t_s;
 
     /* Estados longitudinales (ejemplo Nelson): [du, dw, dq, dtheta] */
-    double X[4];
-    double Xn[4];
+    double X_lon[4];
+    double Xn_lon[4];
 
     /* Altitud / otras variables auxiliares */
     double H_m;
@@ -42,8 +42,8 @@ typedef struct
     double p_next;
 
     /* Matrices lineales (cache) para acelerar si usas SS */
-    double A[4][4];
-    double B[4];
+    double A_lon[4][4];
+    double B_lon[4];
 
     /* Copia de parámetros */
     Params params;

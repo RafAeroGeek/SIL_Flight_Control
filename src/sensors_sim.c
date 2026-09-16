@@ -94,7 +94,7 @@ static double sensors_get_u_body_ms(const FlightSim *sim)
         u_trim = (double)sim->params.V0_ms;
     }
 
-    return u_trim + sim->X[0];
+    return u_trim + sim->X_lon[0];
 }
 
 static double sensors_get_w_body_ms(const FlightSim *sim)
@@ -107,7 +107,7 @@ static double sensors_get_w_body_ms(const FlightSim *sim)
      *
      * w = dw
      */
-    return sim->X[1];
+    return sim->X_lon[1];
 }
 
 static double sensors_get_q_radps(const FlightSim *sim)
@@ -117,7 +117,7 @@ static double sensors_get_q_radps(const FlightSim *sim)
     /*
      * Tu estado X[2] = dq.
      */
-    return sim->X[2];
+    return sim->X_lon[2];
 }
 
 static double sensors_get_theta_rad(const FlightSim *sim)
@@ -135,7 +135,7 @@ static double sensors_get_theta_rad(const FlightSim *sim)
      */
     double gamma0_rad = deg2rad((double)sim->params.gamma0_deg);
 
-    return gamma0_rad + sim->X[3];
+    return gamma0_rad + sim->X_lon[3];
 }
 
 /* ============================================================
@@ -167,9 +167,9 @@ static void SensorsSim_UpdatePitot(SensorsSim *ss,
 
     const double w0 = (double)sim->params.w0_ms;
 
-    double du = sim->X[0];
+    double du = sim->X_lon[0];
 
-    double dw = sim->X[1];
+    double dw = sim->X_lon[1];
 
     double dV = du + w0 * dw / u0;
 
@@ -207,8 +207,8 @@ static void SensorSim_UpdateVanes(SensorsSim *ss,
 
     const double w0 = (double)sim->params.w0_ms;
 
-    double u = u0 + sim->X[0];  // u0 + du
-    double w = w0 + sim->X[1];  // w0 + dw
+    double u = u0 + sim->X_lon[0];  // u0 + du
+    double w = w0 + sim->X_lon[1];  // w0 + dw
 
     // Validación de singularidad
     if (fabs(u) < 0.1) {

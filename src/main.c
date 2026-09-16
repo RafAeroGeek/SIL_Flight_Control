@@ -25,8 +25,8 @@ static int g_Total_Time_ms = SIMULATION_TIME_ms;
 static FlightSim g_sim;
 static Params g_params;          // parámetros accesibles desde tareas
 static FM_Actuators g_act;
-static double g_A[4][4];
-static double g_B[4];
+static double g_A_lon[4][4];
+static double g_B_lon[4];
 static SensorsSim g_sensors;
 static SensorsSimData g_sens_data;
 
@@ -135,7 +135,7 @@ void task_init_1ms(void)
     #if(SYSTEM_SIM_ENV == SIM_PLATFORM_PC)
         /* 4) (Opcional) imprimir A,B desde el sim */
 
-        imprimir_matriz_4x4(g_sim.A, g_sim.B);
+        imprimir_matriz_4x4(g_sim.A_lon, g_sim.B_lon);
 
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
@@ -277,10 +277,10 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
      float u_rud  = Servos_GetCmdDeltaUs(SERVO_RUDDER);
      float u_thro = Servos_GetCmdDeltaUs(SERVO_THROTTLE);
 
-     double du     = g_sim.X[0];
-     double dw     = g_sim.X[1];
-     double dq     = g_sim.X[2];
-     double dtheta = g_sim.X[3];
+     double du     = g_sim.X_lon[0];
+     double dw     = g_sim.X_lon[1];
+     double dq     = g_sim.X_lon[2];
+     double dtheta = g_sim.X_lon[3];
 
      FlightSim_GetActuators(&g_act, y_ail, y_elev, y_rud, y_thro);
      FlightSim_SetActuatorsFromFM(&g_sim, &g_act);
