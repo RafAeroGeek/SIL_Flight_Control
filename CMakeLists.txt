@@ -73,7 +73,7 @@ if(SIL_BUILD_TESTS)
     target_compile_options(test_aircraft_loader_servo PRIVATE -Wall)
     target_link_libraries(test_aircraft_loader_servo PRIVATE m)
     target_compile_definitions(test_aircraft_loader_servo PRIVATE
-        AIRCRAFT_JSON_REAL="${CMAKE_SOURCE_DIR}/aircraft/ss_v1.json"
+        AIRCRAFT_JSON_REAL="${CMAKE_SOURCE_DIR}/aircraft/aircraft_a.json"
         TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}"
     )
     add_test(NAME test_aircraft_loader_servo COMMAND test_aircraft_loader_servo)

@@ -41,7 +41,8 @@ typedef struct
     double p;           // roll rate
     double p_next;
 
-    /* Matrices lineales (cache) para acelerar si usas SS */
+    /* Matrices lineales (cache) para acelerar si se construyen las matrices
+       de espacio de estados */
     double A_lon[4][4];
     double B_lon[4];
 
@@ -73,7 +74,7 @@ typedef struct
     double w_g0;
 
     /* Si true: construye A,B al iniciar */
-    bool build_ss_matrices;
+    bool build_state_space_matrices;
 
     /* Si true: reinicia todo a cero excepto lo dado */
     bool zero_all_first;

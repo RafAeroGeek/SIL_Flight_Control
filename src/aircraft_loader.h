@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* Carga los parametros de una aeronave desde un archivo .json plano
- * (claves 1:1 con los miembros de Params, ver aircraft/ss_v1.json).
+ * (claves 1:1 con los miembros de Params, ver aircraft/aircraft_a.json).
  *
  * *out queda SIEMPRE en un estado valido: arranca en los parametros por
  * defecto seguros y solo se sobreescriben los campos presentes en el JSON.

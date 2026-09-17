@@ -5,7 +5,7 @@ de aeronave en espacio de estados, integrada con RK4, con simulación de servos,
 sensores y un scheduler cooperativo que imita los periodos de tarea de un RTOS.
 
 Estado del vector: `X = [du, dw, dq, dtheta]`.
-Modelo activo: `SS_v1` (4.7 kg, V0 = 36 m/s, 1000 m, gamma0 = -15 deg).
+Modelo activo: `aircraft_a` (4.7 kg, V0 = 36 m/s, 1000 m, gamma0 = -15 deg).
 
 ## Estructura
 
@@ -28,7 +28,7 @@ SIL_Flight_Control/
 | `servo_sim`            | Servos de 1er orden con RK4 y limitador de velocidad  |
 | `flight_sim`           | Planta: estado, actuadores, paso de integración       |
 | `dynamics`             | Matrices A/B, RK4, señales de prueba, saturación      |
-| `dynamic_models`       | Catálogo de modelos (`SS_v1`, `SS_v2`)                |
+| `dynamic_models`       | Catálogo de modelos (`aircraft_a`, `aircraft_b`)      |
 | `sensors_sim`          | Pitot, IMU, GPS y altímetro láser, con ruido y bias   |
 | `flight_management`    | Capa de control (**tipos definidos, sin implementar**)|
 | `sim_PWM_processing`   | Banco de canales PWM (compilado, aún sin usar)        |

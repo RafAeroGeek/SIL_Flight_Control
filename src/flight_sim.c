@@ -40,7 +40,7 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
     def.throttle0  = 0.0;
 
     def.w_g0 = 0.0;
-    def.build_ss_matrices = true;
+    def.build_state_space_matrices = true;
     def.zero_all_first = true;
 
     const FlightSimInit *cfg = ic ? ic : &def;
@@ -60,7 +60,7 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
     sim->p = 0.0;
     sim->p_next = 0.0;
 
-    if (cfg->build_ss_matrices) {
+    if (cfg->build_state_space_matrices) {
         build_state_space_matrices(&sim->params, sim->A_lon, sim->B_lon);
     }
 }

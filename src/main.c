@@ -68,7 +68,7 @@ void task_init_1ms(void)
     FlightSimInit ic = {0};
 
     ic.zero_all_first = true;
-    ic.build_ss_matrices = true;
+    ic.build_state_space_matrices = true;
 
     ic.t0_s     = 0.0;
     ic.X0[0]    = 0.0; ic.X0[1] = 0.0; ic.X0[2] = 0.0; ic.X0[3] = 0.0;  // [du,dw,dq,dtheta]

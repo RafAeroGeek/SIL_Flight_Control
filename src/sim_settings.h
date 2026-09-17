@@ -18,7 +18,7 @@
 #define 	Coro_sim						0		/// Definición de aeronave CoroStick
 #define 	XPlane_sim						1		/// Definición del simulador
 #define		Hell_Hawk_sim					48		/// Definición de aeronave M1 (Bluefish) Hell_Hawk
-#define     SS_V1_sim                       49
+#define     Aircraft_A_sim                  49
 
 /*------------------------------------------*/
 /*********** Seleccion de entorno ***********/

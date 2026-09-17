@@ -1,5 +1,5 @@
 {
-    "name": "SS_v1",
+    "name": "aircraft_a",
     "Alt_m": 1000.0,
     "V0_ms": 36.0,
     "gamma0_deg": -15.0,
@@ -27,7 +27,6 @@
     "delta_a_trim_deg": 0.0,
     "delta_e_trim_deg": 0.0,
     "delta_r_trim_deg": 0.0,
-<<<<<<< HEAD
     "delta_thr_trim": 0.0,
 
     "servo_elevator_tau_s": 0.01,
@@ -57,7 +56,4 @@
     "servo_throttle_y_min_deg": 0.0,
     "servo_throttle_y_max_deg": 1.0,
     "servo_throttle_rate_limit_dps": 2.0
-=======
-    "delta_thr_trim": 0.0
->>>>>>> origin/main
 }

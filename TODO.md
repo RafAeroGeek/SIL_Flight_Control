@@ -16,20 +16,20 @@
 ## SECTION 1: Lateral-Directional Dynamics Core
 
 ### 1.1 Extract A matrix from Matlab
-- **Task:** Extract 5×5 lateral-directional A matrix from Matlab SS_v1 model
-- **Files:** `matlab/SS_v1_lateral_matrix.m` → Copy matrix values
+- **Task:** Extract 5×5 lateral-directional A matrix from Matlab aircraft_a model
+- **Files:** `matlab/aircraft_a_lateral_matrix.m` → Copy matrix values
 - **Acceptance:** Numeric values hardcoded in comments, eigenvalues logged
 - **Priority:** HIGH
 - **Estimate:** 1h
 - **Related:** Branch `dinamica-longitudinal-sensors` has partial work
 
-### 1.2 Create ss_lateral_dir.c stub
-- **Task:** Implement `src/dynamic_models/ss_lateral_dir.c` with RK4 integration
+### 1.2 Create lateral_dir.c stub
+- **Task:** Implement `src/dynamic_models/lateral_dir.c` with RK4 integration
 - **Files:** 
-  - Create: `src/dynamic_models/ss_lateral_dir.c`
-  - Header: `src/dynamic_models/ss_lateral_dir.h`
+  - Create: `src/dynamic_models/lateral_dir.c`
+  - Header: `src/dynamic_models/lateral_dir.h`
   - State vector: `[dp, dr, dv, dphi, dpsi]` (roll rate, yaw rate, lateral vel, roll angle, yaw angle)
-- **Reference:** Mirror structure from `ss_longitudinal.c`
+- **Reference:** Mirror structure from `longitudinal.c`
 - **Acceptance:** Compiles with -Wall, RK4 integrates states correctly
 - **Priority:** HIGH
 - **Estimate:** 2h
@@ -51,19 +51,19 @@
 - **Task:** Implement `#define SIL_CONFIG` with option to select LONGITUDINAL or LATERAL_DIR or COMBINED
 - **Files:** 
   - `CMakeLists.txt`: Add compile flag option
-  - `src/ss_combined.c`: Conditionally call `ss_longitudinal_step()` or `ss_lateral_dir_step()`
+  - `src/combined.c`: Conditionally call `longitudinal_step()` or `lateral_dir_step()`
 - **Acceptance:** Build succeeds with `-DSIL_CONFIG=COMBINED`, state vector expands to 9D
 - **Priority:** HIGH
 - **Estimate:** 1.5h
 - **Related:** Architecture decision from chat history
 
 ### 2.2 Update aircraft JSON for lateral params
-- **Task:** Add lateral-specific fields to `aircraft_configs/ss_v1.json`
+- **Task:** Add lateral-specific fields to `aircraft/aircraft_a.json`
   - Servo limits (aileron, rudder)
   - Sensor noise params for yaw gyro
   - Control gains for lateral autopilot (if any)
-- **Files:** `aircraft_configs/ss_v1.json`
-- **Acceptance:** JSON parses correctly, values match Matlab SS_v1
+- **Files:** `aircraft/aircraft_a.json`
+- **Acceptance:** JSON parses correctly, values match Matlab aircraft_a
 - **Priority:** MEDIUM
 - **Estimate:** 1h
 
@@ -116,7 +116,7 @@
 - **Task:** Implement yaw rate (r) measurement in IMU sensor suite
 - **Files:** 
   - Update: `src/sensors/imu.c`
-  - Config: `aircraft_configs/ss_v1.json` (yaw gyro scale, bias, noise)
+  - Config: `aircraft/aircraft_a.json` (yaw gyro scale, bias, noise)
 - **Acceptance:** Sensor outputs dψ/dt with realistic noise profile
 - **Priority:** MEDIUM
 - **Estimate:** 1.5h

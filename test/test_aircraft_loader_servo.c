@@ -6,7 +6,7 @@
  *   - round-trip del JSON real -> == tabla compilada de servo_sim.c
  *
  * Defines desde CMake:
- *   AIRCRAFT_JSON_REAL : ruta absoluta a aircraft/ss_v1.json
+ *   AIRCRAFT_JSON_REAL : ruta absoluta a aircraft/aircraft_a.json
  *   TEST_TMP_DIR       : directorio de escritura para temporales
  * =========================================================== */
 #include <stdio.h>
