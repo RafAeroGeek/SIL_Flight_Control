@@ -186,6 +186,7 @@ typedef struct
     /* Para estimar aceleraciones por diferencia finita */
     double prev_u_ms;
     double prev_w_ms;
+    double prev_v_ms;
     bool   prev_valid;
 
     /* Generador pseudoaleatorio */
