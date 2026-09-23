@@ -7,6 +7,7 @@
 
 #include "dynamics.h"          // Params, build_state_space_matrices, rk4_step (si aplica)
 #include "flight_management.h" // FM_Actuators (opcional, si quieres usarlo aquí)
+#include "sim_settings.h"      // SIL_CONFIG_LATERAL
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,6 +25,10 @@ typedef struct
     double X_lon[4];
     double Xn_lon[4];
 
+    /* Estados lateral-direccionales (Nelson cap. 5): [dv, dp, dr, dphi] */
+    double X_lat[4];
+    double Xn_lat[4];
+
     /* Altitud / otras variables auxiliares */
     double H_m;
 
@@ -37,14 +42,12 @@ typedef struct
     double w_g;         // gust / vertical wind u otra perturbación
     double theta_set;   // set interno si lo usas
 
-    /* Ejemplo lateral simple (si lo quieres aquí) */
-    double p;           // roll rate
-    double p_next;
-
     /* Matrices lineales (cache) para acelerar si se construyen las matrices
        de espacio de estados */
     double A_lon[4][4];
     double B_lon[4];
+    double A_lat[4][4];
+    double B_lat[4][2];   /* columnas [da, dr] */
 
     /* Copia de parámetros */
     Params params;
@@ -62,6 +65,7 @@ typedef struct
     /* Estado inicial */
     double t0_s;
     double X0[4];
+    double X0_lat[4];     /* [dv, dp, dr, dphi] */
     double H0_m;
 
     /* Actuadores iniciales */
@@ -100,12 +104,16 @@ void FlightSim_SetActuatorsFromFM(FlightSim *sim, const FM_Actuators *act);
 /* Imprimir las matrices A y B del sistema.*/
 void imprimir_matriz_4x4(double A[4][4], double B[4]);
 
+/* Imprime una matriz row-major de filas x cols. */
+void imprimir_matriz(const char *nombre, const double *M, size_t filas, size_t cols);
+
 /* Paso de simulación (ej. 1 ms) */
 void FlightSim_Step(FlightSim *sim, double dt_s);
 
 /* Obtener estado */
 double FlightSim_GetTime(const FlightSim *sim);
 void   FlightSim_GetX(const FlightSim *sim, double out_X4[4]);
+void   FlightSim_GetX_lat(const FlightSim *sim, double out_X4[4]);
 
 #ifdef __cplusplus
 }

@@ -31,6 +31,10 @@
 #define 	AIRCRAFT_JSON_PATH	"aircraft/ugly_stick.json"
 
 
+/* 1 = integra dinamica lateral-direccional ; 0 = solo longitudinal */
+#define 	SIL_CONFIG_LATERAL	1
+
+
 /* Rutina de piloto activa (enum RoutineID en pilot_sim.h).
    ROUTINE_LONGITUDINAL = rutina de regresion; ROUTINE_LAT_DIR ejercita yaw y throttle. */
 #define 	SIM_PILOT_ROUTINE	ROUTINE_LONGITUDINAL

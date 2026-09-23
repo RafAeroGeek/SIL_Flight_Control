@@ -72,6 +72,7 @@ void task_init_1ms(void)
 
     ic.t0_s     = 0.0;
     ic.X0[0]    = 0.0; ic.X0[1] = 0.0; ic.X0[2] = 0.0; ic.X0[3] = 0.0;  // [du,dw,dq,dtheta]
+    ic.X0_lat[0] = 0.0; ic.X0_lat[1] = 0.0; ic.X0_lat[2] = 0.0; ic.X0_lat[3] = 0.0;  // [dv,dp,dr,dphi]
     ic.H0_m     = (double)g_params.Alt_m;
 
     ic.delta_elv0 = 0.0;
