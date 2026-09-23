@@ -52,6 +52,7 @@ flightreview/reports/
 *.kdev4
 .vscode/
 .idea/
+.claude/
 *.swp
 *~
 .DS_Store
