@@ -101,4 +101,13 @@ if(SIL_BUILD_TESTS)
         TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}"
     )
     add_test(NAME test_aircraft_loader_lat COMMAND test_aircraft_loader_lat)
+
+    add_executable(test_lateral_matrices
+        test/test_lateral_matrices.c
+        src/dynamics.c
+    )
+    target_include_directories(test_lateral_matrices PRIVATE src test)
+    target_compile_options(test_lateral_matrices PRIVATE -Wall)
+    target_link_libraries(test_lateral_matrices PRIVATE m)
+    add_test(NAME test_lateral_matrices COMMAND test_lateral_matrices)
 endif()
