@@ -255,13 +255,13 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
      *
      * a_x = u_dot + q*w + g*sin(theta)
      * a_y = v_dot - p*w + r*u - g*cos(theta)*sin(phi)
-     * a_z = w_dot - q*u - g*cos(theta)
+     * a_z = w_dot - q*u - g*cos(theta)*cos(phi)
      *
      * según convención de ejes.
      */
     double ax = du_dot + q * w + 9.81 * sin(theta);
     double ay = 0.0;
-    double az = dw_dot - q * u - 9.81 * cos(theta) * sin(phi);
+    double az = dw_dot - q * u - 9.81 * cos(theta) * cos(phi);
 
     /* Gyro */
     double gx = 0.0;
