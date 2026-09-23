@@ -78,6 +78,48 @@ void rk4_step(DynFunc f,
     }
 }
 
+void linear_dynamics_n(size_t n, size_t m,
+                       const double *X, const double *U,
+                       const double *A, const double *B,
+                       double *Xdot)
+{
+    // Xdot = A*X + B*U  (mismo orden de operaciones que longitudinal_dynamics:
+    // con m = 1 el resultado es bit a bit identico)
+    for (size_t i = 0; i < n; ++i) {
+        double sum = 0.0;
+        for (size_t j = 0; j < n; ++j) sum += A[i*n + j] * X[j];
+        for (size_t k = 0; k < m; ++k) sum += B[i*m + k] * U[k];
+        Xdot[i] = sum;
+    }
+}
+
+bool rk4_step_n(DynFuncN f, size_t n, size_t m,
+                const double *X, const double *U, double dt,
+                const double *A, const double *B,
+                double *X_next)
+{
+    if (n == 0u || n > RK4_N_MAX) return false;
+
+    double k1[RK4_N_MAX], k2[RK4_N_MAX], k3[RK4_N_MAX], k4[RK4_N_MAX];
+    double Xt[RK4_N_MAX];
+
+    f(n, m, X, U, A, B, k1);
+
+    for (size_t i = 0; i < n; ++i) Xt[i] = X[i] + 0.5 * dt * k1[i];
+    f(n, m, Xt, U, A, B, k2);
+
+    for (size_t i = 0; i < n; ++i) Xt[i] = X[i] + 0.5 * dt * k2[i];
+    f(n, m, Xt, U, A, B, k3);
+
+    for (size_t i = 0; i < n; ++i) Xt[i] = X[i] + dt * k3[i];
+    f(n, m, Xt, U, A, B, k4);
+
+    for (size_t i = 0; i < n; ++i) {
+        X_next[i] = X[i] + (dt/6.0) * (k1[i] + 2.0*k2[i] + 2.0*k3[i] + k4[i]);
+    }
+    return true;
+}
+
 double step_signal(double tiempo, double t0, double valor)
 {
     return (tiempo >= t0) ? valor : 0.0;

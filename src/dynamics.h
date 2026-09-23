@@ -2,6 +2,7 @@
 #define DYNAMICS_H_INCLUDED
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,6 +60,27 @@ void rk4_step(DynFunc f,
               const double X[4], double U, double dt,
               const double A[4][4], const double B[4],
               double X_next[4]);
+
+// Integrador RK4 generico: n estados / m entradas.
+// Buffers internos en stack (sin malloc): n <= RK4_N_MAX.
+#define RK4_N_MAX 12u
+
+// Xdot = A*X + B*U ; A row-major n x n, B row-major n x m
+typedef void (*DynFuncN)(size_t n, size_t m,
+                         const double *X, const double *U,
+                         const double *A, const double *B,
+                         double *Xdot);
+
+void linear_dynamics_n(size_t n, size_t m,
+                       const double *X, const double *U,
+                       const double *A, const double *B,
+                       double *Xdot);
+
+// Devuelve false (y no toca X_next) si n > RK4_N_MAX o n == 0
+bool rk4_step_n(DynFuncN f, size_t n, size_t m,
+                const double *X, const double *U, double dt,
+                const double *A, const double *B,
+                double *X_next);
 
 
 // Señales de control

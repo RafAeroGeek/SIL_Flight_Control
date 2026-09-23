@@ -77,4 +77,13 @@ if(SIL_BUILD_TESTS)
         TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}"
     )
     add_test(NAME test_aircraft_loader_servo COMMAND test_aircraft_loader_servo)
+
+    add_executable(test_rk4_n
+        test/test_rk4_n.c
+        src/dynamics.c
+    )
+    target_include_directories(test_rk4_n PRIVATE src test)
+    target_compile_options(test_rk4_n PRIVATE -Wall)
+    target_link_libraries(test_rk4_n PRIVATE m)
+    add_test(NAME test_rk4_n COMMAND test_rk4_n)
 endif()
