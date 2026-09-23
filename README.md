@@ -55,6 +55,45 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release
 ```
 
+## Tests
+
+Tests unitarios en C (opt-in, no cambian el build por defecto):
+
+```bash
+cmake -S . -B build -DSIL_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+### Regresión longitudinal contra una línea base
+
+Los canales longitudinal y lateral están desacoplados, así que cambios en el
+lateral (o en sensores laterales) no deben mover ni un bit de las columnas
+longitudinales del CSV. `test/compare_csv_cols.py` compara columnas **como
+texto** entre dos corridas y sale con código 1 si hay diferencias (reporta la
+primera fila distinta). No está en ctest porque depende de una línea base local
+(`data/*.csv` no se trackea).
+
+```bash
+# 1) Generar la línea base en el commit de referencia
+git checkout <commit_base>
+cmake --build build && ./build/SIL_Flight_Control > /dev/null
+cp data/SIL_sim_servos2.csv data/baseline_<commit_base>.csv
+
+# 2) Volver a la rama, compilar y correr
+git checkout <rama>
+cmake --build build && ./build/SIL_Flight_Control > /dev/null
+
+# 3) Comparar
+python3 test/compare_csv_cols.py data/baseline_<commit_base>.csv data/SIL_sim_servos2.csv \
+    --cols t_s,du_mps,dw_mps,dq_radps,dtheta_rad,y_elev_deg,pitot_ms,AoA_deg,gyro_y_radps,acc_x_mps2,gps_alt_m,laser_alt_m
+```
+
+La línea base puede generarse con `ROUTINE_LONGITUDINAL` y la comparación
+correrse con `ROUTINE_LAT_DIR`: ambas rutinas tienen el mismo `pitch`, así que el
+estado longitudinal debe coincidir. Para la fase v0.2-lateral la línea base es
+`4affdca`.
+
 ## Graficar los resultados
 
 Desde Spyder (Anaconda), abrir y ejecutar `python/plot_state_exp_v3.py`, que es
