@@ -1,11 +1,19 @@
 # SIL_Flight_Control
 
 Simulador SIL (Software-In-the-Loop) de control de vuelo: dinámica longitudinal
-de aeronave en espacio de estados, integrada con RK4, con simulación de servos,
-sensores y un scheduler cooperativo que imita los periodos de tarea de un RTOS.
+y lateral-direccional de aeronave en espacio de estados (lineal, desacoplada),
+integrada con RK4, con simulación de servos, sensores y un scheduler
+cooperativo que imita los periodos de tarea de un RTOS.
 
-Estado del vector: `X = [du, dw, dq, dtheta]`.
-Modelo activo: `aircraft_a` (4.7 kg, V0 = 36 m/s, 1000 m, gamma0 = -15 deg).
+Vectores de estado:
+- Longitudinal: `X_lon = [du, dw, dq, dtheta]`, entrada `delta_e`.
+- Lateral-direccional: `X_lat = [dv, dp, dr, dphi]`, entradas `[delta_a, delta_r]`.
+
+Aeronave activa: `aircraft/ugly_stick.json` (ver `AIRCRAFT_JSON_PATH`).
+
+> ⚠️ Las derivadas **laterales** de `ugly_stick.json` y `aircraft_a.json` son
+> **placeholders del Navion** (Nelson), no las de esas aeronaves
+> (`"lateral_source": "PLACEHOLDER_NAVION_Nelson"`).
 
 ## Estructura
 
@@ -27,9 +35,9 @@ SIL_Flight_Control/
 | `pilot_sim`            | Piloto simulado: escalones, mapeo a canales RC        |
 | `servo_sim`            | Servos de 1er orden con RK4 y limitador de velocidad  |
 | `flight_sim`           | Planta: estado, actuadores, paso de integración       |
-| `dynamics`             | Matrices A/B, RK4, señales de prueba, saturación      |
+| `dynamics`             | Matrices A/B lon y lat, RK4 (4x1 y n/m), señales      |
 | `dynamic_models`       | Catálogo de modelos (`aircraft_a`, `aircraft_b`)      |
-| `sensors_sim`          | Pitot, IMU, GPS y altímetro láser, con ruido y bias   |
+| `sensors_sim`          | Pitot, veleta (α, β), IMU, GPS y láser, ruido y bias  |
 | `flight_management`    | Capa de control (**tipos definidos, sin implementar**)|
 | `sim_PWM_processing`   | Banco de canales PWM (compilado, aún sin usar)        |
 | `sim_settings.h`       | Selección de plataforma y tiempo de simulación        |
@@ -54,6 +62,43 @@ Para una compilación optimizada:
 cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release
 ```
+
+## Modelo lateral-direccional
+
+Nelson, *Flight Stability and Automatic Control*, cap. 5. Pequeñas perturbaciones
+alrededor de vuelo recto y nivelado, en **ejes de estabilidad**:
+
+```
+      | Y_v   Y_p   -(u0 - Y_r)   g·cos(θ0) |          |  0     Y_dr |
+  A = | L_v   L_p    L_r           0        |      B = | L_da   L_dr |
+      | N_v   N_p    N_r           0        |          | N_da   N_dr |
+      | 0     1      0             0        |          |  0     0    |
+```
+
+`build_lateral_matrices` (`src/dynamics.c`) aplica además la corrección por
+producto de inercia: con `D = 1 - I_xz²/(I_x·I_z)`, las filas L y N usan
+`L*x + (I_xz/I_x)·N*x` y `N*x + (I_xz/I_z)·L*x` (`L*x = L_x/D`, `N*x = N_x/D`).
+
+Supuestos: canales desacoplados (integrar el lateral no cambia el
+longitudinal); se desprecia el término `+w0·dp` de ejes cuerpo; no hay `dpsi`,
+así que la velocidad Este del GPS sigue en 0.
+
+### Claves JSON nuevas (`aircraft/*.json`)
+
+| Clave | Unidad | Nota |
+|---|---|---|
+| `theta0_deg` | deg | cabeceo de trim (γ0 + atan2(w0, u0)) |
+| `I_x`, `I_z`, `I_xz` | kg·m² | inercias (default `I_x = I_z = 1`) |
+| `Y_v` | 1/s | fuerza lateral |
+| `Y_p`, `Y_r` | m/s | fuerza lateral |
+| `Y_dr` | m/s² | fuerza lateral (no hay `Y_da`: es 0) |
+| `L_v`, `N_v` | 1/(m·s) | |
+| `L_p`, `L_r`, `N_p`, `N_r` | 1/s | |
+| `L_da`, `L_dr`, `N_da`, `N_dr` | 1/s² | superficies en rad |
+
+`L_x`, `N_x` van **sin asterisco** (`Q·S·b·C/I`); la corrección I_xz se hace en C.
+`u0` sale de la clave existente `u0_ms`. Si falta alguna clave lateral, el
+loader avisa por stderr y deja el default.
 
 ## Tests
 
@@ -126,6 +171,15 @@ En `src/sim_settings.h`:
 - `SIMULATION_TIME_s` — duración simulada (por defecto 10 s)
 - `SYSTEM_SIM_ENV` — `SIM_PLATFORM_PC` (con `printf` y CSV) o `SIM_PLATFORM_RTOS`
 - `AIRCRAFT_SIM` — aeronave seleccionada
+- `AIRCRAFT_JSON_PATH` — JSON de la aeronave activa (relativo a la raíz del repo)
+- `SIL_CONFIG_LATERAL` — `1` integra el canal lateral-direccional (por defecto),
+  `0` solo longitudinal (las columnas laterales del CSV quedan en 0)
+- `SIM_PILOT_ROUTINE` — rutina del piloto simulado. Por defecto
+  `ROUTINE_LAT_DIR`: el mismo `pitch` que `ROUTINE_LONGITUDINAL` más un doblete
+  de alerón (±1.8°, 1–3 s) y uno de timón (±2.7°, 5–7 s). `ROUTINE_LONGITUDINAL`
+  satura el alerón a 20° y queda solo para la regresión longitudinal.
+
+El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad`.
 
 ## Pendientes conocidos
 
