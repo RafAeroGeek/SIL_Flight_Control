@@ -86,4 +86,19 @@ if(SIL_BUILD_TESTS)
     target_compile_options(test_rk4_n PRIVATE -Wall)
     target_link_libraries(test_rk4_n PRIVATE m)
     add_test(NAME test_rk4_n COMMAND test_rk4_n)
+
+    add_executable(test_aircraft_loader_lat
+        test/test_aircraft_loader_lat.c
+        src/aircraft_loader.c
+        src/servo_sim.c
+        src/dynamics.c
+    )
+    target_include_directories(test_aircraft_loader_lat PRIVATE src test)
+    target_compile_options(test_aircraft_loader_lat PRIVATE -Wall)
+    target_link_libraries(test_aircraft_loader_lat PRIVATE m)
+    target_compile_definitions(test_aircraft_loader_lat PRIVATE
+        NAVION_LAT_JSON="${CMAKE_SOURCE_DIR}/test/data/navion_lat.json"
+        TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}"
+    )
+    add_test(NAME test_aircraft_loader_lat COMMAND test_aircraft_loader_lat)
 endif()
