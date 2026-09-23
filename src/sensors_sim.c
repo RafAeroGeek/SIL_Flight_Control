@@ -138,6 +138,46 @@ static double sensors_get_theta_rad(const FlightSim *sim)
     return gamma0_rad + sim->X_lon[3];
 }
 
+static double sensors_get_v_body_ms(const FlightSim *sim)
+{
+    if (!sim) return 0.0;
+
+    /*
+     * Estado lateral X_lat[0] = dv (v0 = 0 en vuelo recto y nivelado).
+     */
+    return sim->X_lat[0];
+}
+
+static double sensors_get_p_radps(const FlightSim *sim)
+{
+    if (!sim) return 0.0;
+
+    /*
+     * Estado lateral X_lat[1] = dp.
+     */
+    return sim->X_lat[1];
+}
+
+static double sensors_get_r_radps(const FlightSim *sim)
+{
+    if (!sim) return 0.0;
+
+    /*
+     * Estado lateral X_lat[2] = dr.
+     */
+    return sim->X_lat[2];
+}
+
+static double sensors_get_phi_rad(const FlightSim *sim)
+{
+    if (!sim) return 0.0;
+
+    /*
+     * Estado lateral X_lat[3] = dphi (trim alas niveladas: phi0 = 0).
+     */
+    return sim->X_lat[3];
+}
+
 /* ============================================================
  * Modelos de sensores
  * ============================================================ */
@@ -202,6 +242,15 @@ static void SensorSim_UpdateVanes(SensorsSim *ss,
      *
      *
      * Aircraft systems identification Morelli Pag.50
+     *
+     * Derrape:
+     *                   _               _
+     *                -1|        v        |
+     *   beta   = tan   |-----------------|
+     *                  |_ sqrt(u^2+w^2) _|
+     *
+     * Sin ruido en beta por ahora: una llamada extra a sensors_noise()
+     * desplazaria toda la secuencia del LCG (rompe la linea base).
      */
     const double u0 = (double)sim->params.u0_ms;
 
@@ -218,6 +267,10 @@ static void SensorSim_UpdateVanes(SensorsSim *ss,
 
     double alpha_rad = atan2(w, u);
     ss->data.vane.AngleOfAttack_deg = alpha_rad * 57.29577951308;  // rad to deg
+
+    double v = sensors_get_v_body_ms(sim);
+    double beta_rad = atan2(v, sqrt(u * u + w * w));
+    ss->data.vane.SideSlipAngle_deg = beta_rad * 57.29577951308;   // rad to deg
     ss->data.vane.valid = true;
 }
 
@@ -234,13 +287,18 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
     double w = sensors_get_w_body_ms(sim);
     double q = sensors_get_q_radps(sim);
     double theta = sensors_get_theta_rad(sim);
-    double phi = 0.0 ; // TODO cambiar en la implemantacion de lateral - direccional.
+    double v = sensors_get_v_body_ms(sim);
+    double p = sensors_get_p_radps(sim);
+    double r = sensors_get_r_radps(sim);
+    double phi = sensors_get_phi_rad(sim);
 
     double du_dot = 0.0;
+    double dv_dot = 0.0;
     double dw_dot = 0.0;
 
     if (ss->prev_valid && dt_s > 0.0) {
         du_dot = (u - ss->prev_u_ms) / dt_s;
+        dv_dot = (v - ss->prev_v_ms) / dt_s;
         dw_dot = (w - ss->prev_w_ms) / dt_s;
     }
 
@@ -255,18 +313,18 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
      *
      * a_x = u_dot + q*w + g*sin(theta)
      * a_y = v_dot - p*w + r*u - g*cos(theta)*sin(phi)
-     * a_z = w_dot - q*u - g*cos(theta)
+     * a_z = w_dot - q*u - g*cos(theta)*cos(phi)
      *
      * según convención de ejes.
      */
     double ax = du_dot + q * w + 9.81 * sin(theta);
-    double ay = 0.0;
-    double az = dw_dot - q * u - 9.81 * cos(theta) * sin(phi);
+    double ay = dv_dot + r * u - p * w - 9.81 * cos(theta) * sin(phi);
+    double az = dw_dot - q * u - 9.81 * cos(theta) * cos(phi);
 
     /* Gyro */
-    double gx = 0.0;
+    double gx = p;
     double gy = q;
-    double gz = 0.0;
+    double gz = r;
 
     gx += ss->cfg.noise.gyro_bias_x_radps;
     gy += ss->cfg.noise.gyro_bias_y_radps;
@@ -317,6 +375,9 @@ static void SensorsSim_UpdateGps(SensorsSim *ss,
      * - no hay velocidad lateral
      * - no hay heading todavía
      * - todo se mueve sobre el eje Norte
+     *
+     * ve = 0 mientras no exista dpsi como estado (el modelo lateral
+     * tiene solo [dv, dp, dr, dphi]).
      *
      * V_N = u cos(theta) + w sin(theta)
      * V_D = -u sin(theta) + w cos(theta)
@@ -426,6 +487,7 @@ void SensorsSim_Init(SensorsSim *ss,
 
     ss->prev_u_ms = sensors_get_u_body_ms(sim);
     ss->prev_w_ms = sensors_get_w_body_ms(sim);
+    ss->prev_v_ms = sensors_get_v_body_ms(sim);
     ss->prev_valid = true;
 
     ss->data.t_s = sim->t_s;
@@ -450,10 +512,10 @@ void SensorsSim_Update(SensorsSim *ss,
 
     double u = sensors_get_u_body_ms(sim);
     double w = sensors_get_w_body_ms(sim);
+    double v = sensors_get_v_body_ms(sim);
 
     ss->data.t_s = sim->t_s;
 
-    // TODO calcular SideSlipAngle_deg en SensorSim_UpdateVanes (queda en 0.0 por ahora)
     SensorsSim_UpdatePitot(ss, sim);
     SensorSim_UpdateVanes(ss, sim);
     SensorsSim_UpdateImu(ss, sim, dt_s);
@@ -462,6 +524,7 @@ void SensorsSim_Update(SensorsSim *ss,
 
     ss->prev_u_ms = u;
     ss->prev_w_ms = w;
+    ss->prev_v_ms = v;
     ss->prev_valid = true;
 }
 
