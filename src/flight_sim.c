@@ -32,6 +32,7 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
     FlightSimInit def = {0};
     def.t0_s = 0.0;
     def.X0[0] = 0.0; def.X0[1] = 0.0; def.X0[2] = 0.0; def.X0[3] = 0.0;
+    def.X0_lat[0] = 0.0; def.X0_lat[1] = 0.0; def.X0_lat[2] = 0.0; def.X0_lat[3] = 0.0;
     def.H0_m = (double)p->Alt_m;
 
     def.delta_elv0 = 0.0;
@@ -47,6 +48,7 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
 
     sim->t_s = cfg->t0_s;
     copy4(sim->X_lon, cfg->X0);
+    copy4(sim->X_lat, cfg->X0_lat);
     sim->H_m = cfg->H0_m;
 
     sim->delta_elv = cfg->delta_elv0;
@@ -57,11 +59,10 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
     sim->w_g = cfg->w_g0;
 
     sim->theta_set = 0.0; /* por claridad */
-    sim->p = 0.0;
-    sim->p_next = 0.0;
 
     if (cfg->build_state_space_matrices) {
         build_state_space_matrices(&sim->params, sim->A_lon, sim->B_lon);
+        build_lateral_matrices(&sim->params, sim->A_lat, sim->B_lat);
     }
 }
 
@@ -141,6 +142,19 @@ void imprimir_matriz_4x4(double A[4][4], double B[4]) {
     printf("]^T\n\n");
 }
 
+void imprimir_matriz(const char *nombre, const double *M, size_t filas, size_t cols)
+{
+    printf("Matriz %s (%zux%zu):\n", nombre, filas, cols);
+    for (size_t i = 0; i < filas; ++i) {
+        printf("  [ ");
+        for (size_t j = 0; j < cols; ++j) {
+            printf("%10.5f ", M[i*cols + j]);
+        }
+        printf("]\n");
+    }
+    printf("\n");
+}
+
 void FlightSim_Step(FlightSim *sim, double dt_s)
 {
     if (!sim || !sim->initialized) return;
@@ -148,6 +162,14 @@ void FlightSim_Step(FlightSim *sim, double dt_s)
 
     rk4_step(longitudinal_dynamics, sim->X_lon, sim->delta_elv, dt_s, sim->A_lon , sim->B_lon, sim->Xn_lon);
     copy4(sim->X_lon, sim->Xn_lon);
+
+#if (SIL_CONFIG_LATERAL == 1)
+    /* Canal lateral desacoplado: no toca X_lon. u = [da, dr] en rad. */
+    const double U_lat[2] = { sim->delta_ail, sim->delta_rud };
+    rk4_step_n(linear_dynamics_n, 4u, 2u, sim->X_lat, U_lat, dt_s,
+               &sim->A_lat[0][0], &sim->B_lat[0][0], sim->Xn_lat);
+    copy4(sim->X_lat, sim->Xn_lat);
+#endif
 
     sim->t_s += dt_s;
 }
@@ -162,4 +184,10 @@ void FlightSim_GetX(const FlightSim *sim, double out_X4[4])
 {
     if (!sim || !out_X4) return;
     copy4(out_X4, sim->X_lon);
+}
+
+void FlightSim_GetX_lat(const FlightSim *sim, double out_X4[4])
+{
+    if (!sim || !out_X4) return;
+    copy4(out_X4, sim->X_lat);
 }

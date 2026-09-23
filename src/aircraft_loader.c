@@ -14,7 +14,11 @@ static const Params kDefaultParams = {
     .Z_u_hat = 0.0f, .Z_w_hat = 0.0f, .u0_ms = 1.0f, .w0_ms = 0.0f,
     .Z_theta = 0.0f, .Z_de = 0.0f,
     .M_u_hat = 0.0f, .M_w_hat = 0.0f, .M_q_hat = 0.0f, .M_de = 0.0f,
-    .L_da = 0.0f, .L_p = 0.0f,
+    .theta0_deg = 0.0f,
+    .I_x = 1.0f, .I_z = 1.0f, .I_xz = 0.0f,   /* I_x, I_z != 0: evita dividir entre 0 */
+    .Y_v = 0.0f, .Y_p = 0.0f, .Y_r = 0.0f, .Y_dr = 0.0f,
+    .L_v = 0.0f, .L_p = 0.0f, .L_r = 0.0f, .L_da = 0.0f, .L_dr = 0.0f,
+    .N_v = 0.0f, .N_p = 0.0f, .N_r = 0.0f, .N_da = 0.0f, .N_dr = 0.0f,
     .delta_a_trim_deg = 0.0f, .delta_e_trim_deg = 0.0f,
     .delta_r_trim_deg = 0.0f, .delta_thr_trim = 0.0f
 };
@@ -32,33 +36,50 @@ static char s_name_buf[AIRCRAFT_NAME_BUF_SIZE];
 typedef struct {
     const char *key;
     size_t offset;
+    bool   warn_if_missing;   /* true: avisa por stderr si la clave no esta */
 } FloatField;
 
 /* Fuente unica de verdad clave-json <-> campo de Params. */
 static const FloatField kFloatFields[] = {
-    { "Alt_m",            offsetof(Params, Alt_m) },
-    { "V0_ms",            offsetof(Params, V0_ms) },
-    { "gamma0_deg",       offsetof(Params, gamma0_deg) },
-    { "masa_kg",          offsetof(Params, masa_kg) },
-    { "X_u",              offsetof(Params, X_u) },
-    { "X_w",              offsetof(Params, X_w) },
-    { "X_theta",          offsetof(Params, X_theta) },
-    { "Z_u_hat",          offsetof(Params, Z_u_hat) },
-    { "Z_w_hat",          offsetof(Params, Z_w_hat) },
-    { "u0_ms",            offsetof(Params, u0_ms) },
-    { "w0_ms",            offsetof(Params, w0_ms) },
-    { "Z_theta",          offsetof(Params, Z_theta) },
-    { "Z_de",             offsetof(Params, Z_de) },
-    { "M_u_hat",          offsetof(Params, M_u_hat) },
-    { "M_w_hat",          offsetof(Params, M_w_hat) },
-    { "M_q_hat",          offsetof(Params, M_q_hat) },
-    { "M_de",             offsetof(Params, M_de) },
-    { "L_da",             offsetof(Params, L_da) },
-    { "L_p",              offsetof(Params, L_p) },
-    { "delta_a_trim_deg", offsetof(Params, delta_a_trim_deg) },
-    { "delta_e_trim_deg", offsetof(Params, delta_e_trim_deg) },
-    { "delta_r_trim_deg", offsetof(Params, delta_r_trim_deg) },
-    { "delta_thr_trim",   offsetof(Params, delta_thr_trim) },
+    { "Alt_m",             offsetof(Params, Alt_m),              false },
+    { "V0_ms",             offsetof(Params, V0_ms),              false },
+    { "gamma0_deg",        offsetof(Params, gamma0_deg),         false },
+    { "masa_kg",           offsetof(Params, masa_kg),            false },
+    { "X_u",               offsetof(Params, X_u),                false },
+    { "X_w",               offsetof(Params, X_w),                false },
+    { "X_theta",           offsetof(Params, X_theta),            false },
+    { "Z_u_hat",           offsetof(Params, Z_u_hat),            false },
+    { "Z_w_hat",           offsetof(Params, Z_w_hat),            false },
+    { "u0_ms",             offsetof(Params, u0_ms),              false },
+    { "w0_ms",             offsetof(Params, w0_ms),              false },
+    { "Z_theta",           offsetof(Params, Z_theta),            false },
+    { "Z_de",              offsetof(Params, Z_de),               false },
+    { "M_u_hat",           offsetof(Params, M_u_hat),            false },
+    { "M_w_hat",           offsetof(Params, M_w_hat),            false },
+    { "M_q_hat",           offsetof(Params, M_q_hat),            false },
+    { "M_de",              offsetof(Params, M_de),               false },
+    { "theta0_deg",        offsetof(Params, theta0_deg),         true },
+    { "I_x",               offsetof(Params, I_x),                true },
+    { "I_z",               offsetof(Params, I_z),                true },
+    { "I_xz",              offsetof(Params, I_xz),               true },
+    { "Y_v",               offsetof(Params, Y_v),                true },
+    { "Y_p",               offsetof(Params, Y_p),                true },
+    { "Y_r",               offsetof(Params, Y_r),                true },
+    { "Y_dr",              offsetof(Params, Y_dr),               true },
+    { "L_v",               offsetof(Params, L_v),                true },
+    { "L_p",               offsetof(Params, L_p),                true },
+    { "L_r",               offsetof(Params, L_r),                true },
+    { "L_da",              offsetof(Params, L_da),               true },
+    { "L_dr",              offsetof(Params, L_dr),               true },
+    { "N_v",               offsetof(Params, N_v),                true },
+    { "N_p",               offsetof(Params, N_p),                true },
+    { "N_r",               offsetof(Params, N_r),                true },
+    { "N_da",              offsetof(Params, N_da),               true },
+    { "N_dr",              offsetof(Params, N_dr),               true },
+    { "delta_a_trim_deg",  offsetof(Params, delta_a_trim_deg),   false },
+    { "delta_e_trim_deg",  offsetof(Params, delta_e_trim_deg),   false },
+    { "delta_r_trim_deg",  offsetof(Params, delta_r_trim_deg),   false },
+    { "delta_thr_trim",    offsetof(Params, delta_thr_trim),     false },
 };
 
 #define AIRCRAFT_NUM_FLOAT_FIELDS (sizeof(kFloatFields) / sizeof(kFloatFields[0]))
@@ -146,11 +167,18 @@ bool Aircraft_LoadParams(const char *json_path, Params *out)
         fprintf(stderr, "Aircraft_LoadParams: %s esta vacio\n", json_path);
         return false;
     }
+    if (n == AIRCRAFT_JSON_BUF_SIZE - 1u) {
+        fprintf(stderr, "Aircraft_LoadParams: %s pudo truncarse (buffer de %u B)\n",
+                json_path, AIRCRAFT_JSON_BUF_SIZE);
+    }
 
     for (size_t i = 0; i < AIRCRAFT_NUM_FLOAT_FIELDS; i++) {
         float value;
         if (find_number(buf, kFloatFields[i].key, &value)) {
             *(float *)((char *)out + kFloatFields[i].offset) = value;
+        } else if (kFloatFields[i].warn_if_missing) {
+            fprintf(stderr, "Aircraft_LoadParams: falta '%s' en %s (queda en default)\n",
+                    kFloatFields[i].key, json_path);
         }
     }
 
@@ -222,6 +250,10 @@ bool Aircraft_LoadServoCfg(const char *json_path, ServoCfg_s out[SERVO_SIM_N_SER
     if (n == 0u) {
         fprintf(stderr, "Aircraft_LoadServoCfg: %s esta vacio\n", json_path);
         return false;
+    }
+    if (n == AIRCRAFT_JSON_BUF_SIZE - 1u) {
+        fprintf(stderr, "Aircraft_LoadServoCfg: %s pudo truncarse (buffer de %u B)\n",
+                json_path, AIRCRAFT_JSON_BUF_SIZE);
     }
 
     for (size_t i = 0; i < AIRCRAFT_NUM_SERVO_FIELDS; i++) {

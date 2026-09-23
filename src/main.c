@@ -25,8 +25,6 @@ static int g_Total_Time_ms = SIMULATION_TIME_ms;
 static FlightSim g_sim;
 static Params g_params;          // parámetros accesibles desde tareas
 static FM_Actuators g_act;
-static double g_A_lon[4][4];
-static double g_B_lon[4];
 static SensorsSim g_sensors;
 static SensorsSimData g_sens_data;
 
@@ -72,6 +70,7 @@ void task_init_1ms(void)
 
     ic.t0_s     = 0.0;
     ic.X0[0]    = 0.0; ic.X0[1] = 0.0; ic.X0[2] = 0.0; ic.X0[3] = 0.0;  // [du,dw,dq,dtheta]
+    ic.X0_lat[0] = 0.0; ic.X0_lat[1] = 0.0; ic.X0_lat[2] = 0.0; ic.X0_lat[3] = 0.0;  // [dv,dp,dr,dphi]
     ic.H0_m     = (double)g_params.Alt_m;
 
     ic.delta_elv0 = 0.0;
@@ -136,6 +135,10 @@ void task_init_1ms(void)
         /* 4) (Opcional) imprimir A,B desde el sim */
 
         imprimir_matriz_4x4(g_sim.A_lon, g_sim.B_lon);
+        #if (SIL_CONFIG_LATERAL == 1)
+            imprimir_matriz("A_lat [dv,dp,dr,dphi]", &g_sim.A_lat[0][0], 4u, 4u);
+            imprimir_matriz("B_lat [da,dr]",         &g_sim.B_lat[0][0], 4u, 2u);
+        #endif
 
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
@@ -162,7 +165,8 @@ void task_init_1ms(void)
                         "acc_x_mps2,acc_y_mps2,acc_z_mps2,"                 // aceleraciones
                         "gps_lat_deg,gps_lon_deg,gps_alt_m,"                // GPS data
                         "gps_vn_ms,gps_ve_ms,gps_vd_ms,"
-                        "laser_alt_m \n" );                                   // Laser
+                        "laser_alt_m,"                                      // Laser
+                        "dv_mps,dp_radps,dr_radps,dphi_rad\n" );            // Estado lateral-direccional
 
             fflush(g_fp);
             printf("CSV abierto: %s\n", csv_path);
@@ -282,6 +286,10 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
      double dq     = g_sim.X_lon[2];
      double dtheta = g_sim.X_lon[3];
 
+     /* Estado lateral-direccional (queda en 0 con SIL_CONFIG_LATERAL == 0) */
+     double X_lat[4];
+     FlightSim_GetX_lat(&g_sim, X_lat);
+
      FlightSim_GetActuators(&g_act, y_ail, y_elev, y_rud, y_thro);
      FlightSim_SetActuatorsFromFM(&g_sim, &g_act);
      FlightSim_Step(&g_sim, dt_s);
@@ -317,7 +325,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.3f,%.3f,%.3f,"       // acelerometros
                     "%.3f,%.3f,%.3f,"       // gps data
                     "%.3f,%.3f,%.3f,"       // gps vn ve vd
-                    "%.6f\n",               // Laser
+                    "%.6f,"                 // Laser
+                    "%.6f,%.6f,%.6f,%.6f\n", // dv, dp, dr, dphi
                     (double)t_s,                                            // 1. tiempo
                     (double)elev_cmd, (double)aile_cmd,                     // comandos us
                     (double)rud_cmd, (double)thro_cmd,                      //
@@ -355,7 +364,9 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     (double)g_sens_data.gps.ve_ms,
                     (double)g_sens_data.gps.vd_ms,
 
-                    (double)g_sens_data.laser.range_m );                    // Laser
+                    (double)g_sens_data.laser.range_m,                      // Laser
+
+                    X_lat[0], X_lat[1], X_lat[2], X_lat[3] );               // dv, dp, dr, dphi
 
             /* Flush cada 100 ms */
             if ((now_ms % 100u) == 0u) {
@@ -409,12 +420,19 @@ static void Task_500ms(uint32_t now_ms, uint32_t dt_ms)
 static void print_params(const Params *p)
 {
     printf("======================================================================\n");
+#if (SIL_CONFIG_LATERAL == 1)
+    printf("DINÁMICA LONGITUDINAL + LATERAL-DIRECCIONAL DE AERONAVE - MÉTODO RK4 (C11)\n");
+#else
     printf("DINÁMICA LONGITUDINAL DE AERONAVE - MÉTODO RK4 (C11)\n");
+#endif
     printf("======================================================================\n");
     printf("Configuración: %s\n", p->name);
     printf("Altitud: %.1f m\n", p->Alt_m);
     printf("Velocidad de vuelo: %.3f m/s\n", p->V0_ms);
     printf("Masa: %.3f kg\n", p->masa_kg);
     printf("gamma_0: %.2f deg\n", p->gamma0_deg);
+    printf("u0: %.3f m/s\n", p->u0_ms);
+    printf("theta_0: %.2f deg\n", p->theta0_deg);
+    printf("I_x: %.3f  I_z: %.3f  I_xz: %.3f kg*m^2\n", p->I_x, p->I_z, p->I_xz);
     printf("---------------------------------------------------------------------\n");
 }

@@ -2,7 +2,8 @@
 ## Fase 2: Lateral-Directional Dynamics Integration
 
 **Generado:** 2026-09-09  
-**Estatus:** Post-MVP (v0.1-mvp merged to main)
+**Actualizado:** 2026-09-23 (v0.2-lateral, rama `dinamica-lateral-dir-sensores`)  
+**Estatus:** Dinámica lateral-direccional lineal integrada (placeholders Navion)
 
 ---
 
@@ -10,30 +11,13 @@
 - **v0.1-mvp:** Longitudinal dynamics + JSON aircraft config + flightreview visualization ✅
 - **Next milestone:** Lateral-directional (roll, yaw) coupled with longitudinal for full 6-DOF
 - **Target:** v0.2-lateral (est. 2 weeks)
+- **v0.2-lateral (hecho):** modelo lateral de 4 estados `[dv, dp, dr, dphi]`
+  (Nelson cap. 5) con corrección I_xz, RK4 genérico, claves JSON laterales,
+  `SIL_CONFIG_LATERAL`, rutina `ROUTINE_LAT_DIR`, IMU (p, r, ay, phi) y veleta (β)
 
 ---
 
 ## SECTION 1: Lateral-Directional Dynamics Core
-
-### 1.1 Extract A matrix from Matlab
-- **Task:** Extract 5×5 lateral-directional A matrix from Matlab aircraft_a model
-- **Files:** `matlab/aircraft_a_lateral_matrix.m` → Copy matrix values
-- **Acceptance:** Numeric values hardcoded in comments, eigenvalues logged
-- **Priority:** HIGH
-- **Estimate:** 1h
-- **Related:** Branch `dinamica-longitudinal-sensors` has partial work
-
-### 1.2 Create lateral_dir.c stub
-- **Task:** Implement `src/dynamic_models/lateral_dir.c` with RK4 integration
-- **Files:** 
-  - Create: `src/dynamic_models/lateral_dir.c`
-  - Header: `src/dynamic_models/lateral_dir.h`
-  - State vector: `[dp, dr, dv, dphi, dpsi]` (roll rate, yaw rate, lateral vel, roll angle, yaw angle)
-- **Reference:** Mirror structure from `longitudinal.c`
-- **Acceptance:** Compiles with -Wall, RK4 integrates states correctly
-- **Priority:** HIGH
-- **Estimate:** 2h
-- **Related:** TODO.md issue #1.1
 
 ### 1.3 Eigenvalue analysis of lateral A matrix
 - **Task:** Compute eigenvalues/eigenvectors to verify stability characteristics
@@ -42,46 +26,12 @@
 - **Priority:** MEDIUM (diagnostic, not blocking)
 - **Estimate:** 1.5h
 - **Related:** Helps validate system response before testing
-
----
-
-## SECTION 2: Conditional Compilation & Config
-
-### 2.1 Add SIL_CONFIG_LATERAL to CMakeLists.txt
-- **Task:** Implement `#define SIL_CONFIG` with option to select LONGITUDINAL or LATERAL_DIR or COMBINED
-- **Files:** 
-  - `CMakeLists.txt`: Add compile flag option
-  - `src/combined.c`: Conditionally call `longitudinal_step()` or `lateral_dir_step()`
-- **Acceptance:** Build succeeds with `-DSIL_CONFIG=COMBINED`, state vector expands to 9D
-- **Priority:** HIGH
-- **Estimate:** 1.5h
-- **Related:** Architecture decision from chat history
-
-### 2.2 Update aircraft JSON for lateral params
-- **Task:** Add lateral-specific fields to `aircraft/aircraft_a.json`
-  - Servo limits (aileron, rudder)
-  - Sensor noise params for yaw gyro
-  - Control gains for lateral autopilot (if any)
-- **Files:** `aircraft/aircraft_a.json`
-- **Acceptance:** JSON parses correctly, values match Matlab aircraft_a
-- **Priority:** MEDIUM
-- **Estimate:** 1h
+- **Status:** Navion verificado (numpy: −8.4330, −0.4861±2.3343j, −0.00893).
+  Pendiente para las derivadas reales (8.1).
 
 ---
 
 ## SECTION 3: Servo & Control Expansion
-
-### 3.1 Expand pilot_sim.c for aileron/rudder
-- **Task:** Add step/ramp command generators for aileron and rudder channels
-- **Files:** `src/pilot_sim.c`
-- **Details:**
-  - Mirror existing throttle/elevator logic
-  - Pilot command units: normalized [-1, +1] (aileron, rudder)
-  - Test routine: step inputs at T=5s, T=15s, T=25s spread across 30s flight
-- **Acceptance:** CSV output shows aileron/rudder commands changing at expected times
-- **Priority:** HIGH
-- **Estimate:** 1.5h
-- **Related:** Issue: Servo subsystem pilot command ambiguity (partially resolved in MVP)
 
 ### 3.2 Acceptance test: servo + pilot commands (lateral)
 - **Task:** Create `test/test_pilot_lateral_servo.c`
@@ -112,16 +62,6 @@
 - **Priority:** HIGH (affects simulation fidelity)
 - **Estimate:** 2h
 
-### 4.2 Add yaw gyro sensor
-- **Task:** Implement yaw rate (r) measurement in IMU sensor suite
-- **Files:** 
-  - Update: `src/sensors/imu.c`
-  - Config: `aircraft/aircraft_a.json` (yaw gyro scale, bias, noise)
-- **Acceptance:** Sensor outputs dψ/dt with realistic noise profile
-- **Priority:** MEDIUM
-- **Estimate:** 1.5h
-- **Related:** Necessary for lateral-directional closed-loop control
-
 ---
 
 ## SECTION 5: Flight Management System (Future)
@@ -142,24 +82,17 @@
 - **Task:** Audit `-Wall` output across all .c files, fix warnings
 - **Files:** `src/**/*.c`, `test/**/*.c`
 - **Acceptance:** `cmake --build build -- -Wall` produces 0 warnings
+- **Status:** 8 warnings left (v0.2 removed `g_A_lon`/`g_B_lon`)
 - **Priority:** MEDIUM
 - **Estimate:** 1.5h
 
-### 6.2 Decide: Track .claude/ directory in repo
-- **Task:** Decision: Include `.claude/` (Claude Code artifacts) in Git or .gitignore?
-- **Pro track:** Reproducible runs, audit trail of code changes
-- **Pro ignore:** Cleaner history, fewer conflicts
-- **Files:** `.gitignore` or `.claude/` subdirs
-- **Decision maker:** Rafa
-- **Priority:** LOW (administrative)
-- **Estimate:** 0.5h
-
-### 6.3 Add ctest harness for lateral dynamics
-- **Task:** Create `test/CMakeLists.txt` entry for lateral servo/pilot acceptance tests
-- **Files:** `test/CMakeLists.txt`
-- **Acceptance:** `ctest --test-dir build` runs all tests including new lateral suite
+### 6.3 Add ctest harness for lateral servo/pilot test
+- **Task:** Register `test/test_pilot_lateral_servo.c` (issue 3.2) in ctest
+- **Note:** Lateral dynamics tests already in ctest (v0.2): `test_rk4_n`,
+  `test_aircraft_loader_lat`, `test_lateral_matrices`
+- **Files:** `CMakeLists.txt`
 - **Priority:** MEDIUM
-- **Estimate:** 1h
+- **Estimate:** 0.5h
 
 ---
 
@@ -176,6 +109,63 @@
 - **Files:** `docs/git_workflow.md` or `README.md`
 - **Priority:** LOW
 - **Estimate:** 0.5h
+
+---
+
+## SECTION 8: Pendientes v0.2-lateral
+
+### 8.1 Derivadas laterales reales (reemplazar placeholders Navion)
+- **Task:** Cargar en `aircraft/ugly_stick.json` las derivadas laterales reales
+  (desde MATLAB) y las de `aircraft/aircraft_a.json`. Hoy ambos traen
+  `"lateral_source": "PLACEHOLDER_NAVION_Nelson"`.
+- **Note:** Los valores originales de `aircraft_a` eran `L_da = 4.66`, `L_p = -1.30`.
+- **Priority:** HIGH
+
+### 8.2 Verificar derivadas de control del Navion
+- **Task:** Contrastar `L_da, L_dr, N_da, N_dr, Y_dr` contra Nelson, apéndice B.
+- **Priority:** MEDIUM
+
+### 8.3 Signo del timón
+- **Observado:** yaw > 0 -> dr < 0 (consistente con `N_dr < 0`, convención de
+  Nelson). Decidir si la convención stick/PWM del rudder debe invertirse.
+- **Priority:** MEDIUM
+
+### 8.4 dpsi como 5º estado
+- **Task:** Agregar dpsi -> GPS `ve` distinto de 0 y heading hold.
+- **Priority:** MEDIUM
+
+### 8.5 Término w0 de ejes cuerpo en la fuerza lateral
+- **Task:** El lateral está en ejes de estabilidad; se desprecia `+w0*dp`.
+- **Priority:** LOW
+
+### 8.6 theta de sensores vs theta0 del modelo lateral
+- **Task:** `sensors_get_theta_rad` usa `gamma0 + dtheta`; la matriz lateral usa
+  `theta0_deg` (= gamma0 + alpha0). Unificar (cambia la línea base).
+- **Priority:** LOW
+
+### 8.7 Ruido en la veleta de beta
+- **Task:** Agregar ruido a `SideSlipAngle_deg` en un solo commit que regenere la
+  línea base (una llamada nueva a `sensors_noise()` desplaza el LCG).
+- **Priority:** LOW
+
+### 8.8 Migrar longitudinal a rk4_step_n
+- **Task:** Usar `rk4_step_n` también en el longitudinal y eliminar `rk4_step`
+  (`test_rk4_n` T1 ya prueba la equivalencia bit a bit).
+- **Priority:** LOW
+
+### 8.9 Leyes de control laterales
+- **Task:** Yaw damper, wing leveler, heading hold en `flight_management.c`
+  (ver 5.1).
+- **Priority:** LOW (v0.3)
+
+### 8.10 Plots del canal lateral en flightreview
+- **Task:** Graficar `dv/dp/dr/dphi`, `gyro_x/z`, `acc_y`, `SSA_deg` (otra rama).
+- **Priority:** MEDIUM
+
+### 8.11 Typo en diapositivas: L_v del Navion
+- **Task:** Corregir `L_v = -0.0298` -> `-0.299` (con el typo el espiral sale
+  inestable: λ = +0.0385).
+- **Priority:** LOW
 
 ---
 

@@ -31,9 +31,17 @@
 #define 	AIRCRAFT_JSON_PATH	"aircraft/ugly_stick.json"
 
 
+/* 1 = integra dinamica lateral-direccional ; 0 = solo longitudinal */
+#define 	SIL_CONFIG_LATERAL	1
+
+
 /* Rutina de piloto activa (enum RoutineID en pilot_sim.h).
-   ROUTINE_LONGITUDINAL = rutina de regresion; ROUTINE_LAT_DIR ejercita yaw y throttle. */
-#define 	SIM_PILOT_ROUTINE	ROUTINE_LONGITUDINAL
+   ROUTINE_LAT_DIR (por defecto): pitch identico a ROUTINE_LONGITUDINAL mas
+   dobletes pequenos de aleron y timon, dentro del rango lineal.
+   ROUTINE_LONGITUDINAL: da un escalon de roll = 1.0 -> 500 us -> aleron
+   saturado a 20 deg; con el lateral activo lleva phi muy fuera del rango
+   lineal. Queda SOLO para la regresion longitudinal. */
+#define 	SIM_PILOT_ROUTINE	ROUTINE_LAT_DIR
 
 /* Ganancia stick normalizado ([-1,1] ejes, [0,1] throttle) -> delta PWM [us].
    El piloto emite valores normalizados; main.c los convierte a us antes de los servos. */
