@@ -24,8 +24,11 @@ def test_cargar_ruta_valida(synthetic_csv):
     app.cargar_ruta(synthetic_csv)
     assert app._estado_doc["log"] is not None
     assert app._estado_doc["log"].n_samples == 60
-    # 4 pestanas: Dinamica, Control, Sensores, Resumen
-    assert len(app.tabs_container.tabs) == 4
+    titulos = [panel.title for panel in app.tabs_container.tabs]
+    assert titulos == [
+        "Dinamica Longitudinal", "Dinamica Lat-Dir", "Control de Superficies",
+        "Sensores e Inercial", "Resumen",
+    ]
     for panel in app.tabs_container.tabs:
         assert panel.child.children  # cada pestana: leyenda + grafica(s)
 

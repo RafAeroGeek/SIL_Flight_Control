@@ -125,3 +125,41 @@ def test_real_csv_render(real_csv):
     models, _ = render_all(log)
     assert len(models) == 3
     assert all(_lines(m) for m in models)
+
+
+# --------------------------------------------------------------------------
+# Pestana Dinamica Lat-Dir
+# --------------------------------------------------------------------------
+from flightreview.plots import lat_dir_dynamics  # noqa: E402
+from flightreview.plots.registry import PlotGroup  # noqa: E402
+
+
+def _lat_dir(log):
+    xr = new_x_range(log)
+    return PlotGroup("Estados", lat_dir_dynamics.build).render(log, log_source(log), xr), xr
+
+
+def test_lat_dir_cuatro_figuras(synthetic_csv):
+    log = load_log(synthetic_csv)
+    col, xr = _lat_dir(log)
+    figs = col.children
+    assert [f.title.text for f in figs] == [
+        "Velocidad lateral (dv)", "Tasa de alabeo (dp)",
+        "Tasa de guinada (dr)", "Angulo de alabeo (dphi)",
+    ]
+    for f in figs:
+        assert len(_lines(f)) == 1
+        assert any(isinstance(t, HoverTool) for t in f.tools)
+        assert f.x_range is xr
+        # 3 tramos de modo 0->1->0
+        assert len([r for r in f.renderers if isinstance(r, BoxAnnotation)]) == 3
+
+
+def test_lat_dir_sin_columnas_laterales(tmp_path, synthetic_df):
+    # CSV longitudinal (p. ej. linea base previa a v0.2-lateral).
+    p = tmp_path / "solo_lon.csv"
+    synthetic_df.drop(columns=["dv_mps", "dp_radps", "dr_radps", "dphi_rad "]).to_csv(p, index=False)
+    col, _ = _lat_dir(load_log(str(p)))
+    for f in col.children:
+        assert "(no disponible)" in f.title.text
+        assert not _lines(f)

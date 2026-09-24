@@ -83,6 +83,7 @@ def build_tab_groups() -> list[TabGroup]:
     """Pestanas del servidor interactivo (independiente de PREDEFINED/report.py)."""
     return [
         TabGroup("Dinamica Longitudinal", [PlotGroup("Estados", longi_dynamics.build)]),
+        TabGroup("Dinamica Lat-Dir", [PlotGroup("Estados", lat_dir_dynamics.build)]),
         TabGroup("Control de Superficies", [PlotGroup("Comandos", control_commands.build)]),
         TabGroup("Sensores e Inercial", [
             PlotGroup("Airspeed", sensor_airspeed.build),
@@ -97,6 +98,7 @@ def build_tab_groups() -> list[TabGroup]:
 
 from flightreview.plots import (  # noqa: E402
     control_commands,
+    lat_dir_dynamics,
     longi_dynamics,
     sensor_airspeed,
     sensor_gps,
