@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Grafica de actitud: angulos estimados de Roll / Pitch / Yaw vs setpoints.
 
-El simulador es longitudinal: hoy solo se resuelve pitch (``dtheta_rad``). Roll,
-Yaw y los setpoints se dibujan solo si el CSV los trae; si no, se omiten y se
-deja constancia en el titulo.
+El simulador registra pitch (``dtheta_rad``) y roll (``dphi_rad``). Yaw y los
+setpoints se dibujan solo si el CSV los trae; si no, se omiten y se deja
+constancia en el titulo.
 """
 
 from __future__ import annotations

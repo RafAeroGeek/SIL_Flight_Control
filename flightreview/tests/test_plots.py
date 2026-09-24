@@ -112,12 +112,13 @@ def test_vibracion_tiene_modulo_y_bandas(synthetic_csv):
     assert len(_lines(fig)) == 4  # acc x/y/z + |a|
 
 
-def test_angular_rate_incluye_dq_dashed(synthetic_csv):
+def test_angular_rate_incluye_dp_dq_dr_dashed(synthetic_csv):
     log = load_log(synthetic_csv)
     fig = PREDEFINED[1].render(log, log_source(log), new_x_range(log))
-    dashes = {tuple(r.glyph.line_dash) if r.glyph.line_dash else () for r in _lines(fig)}
-    assert len(_lines(fig)) == 4  # gyro x/y/z + dq
-    assert any(d for d in dashes), "dq debe ir discontinua"
+    lineas = _lines(fig)
+    assert len(lineas) == 6  # gyro x/y/z + dp/dq/dr
+    discontinuas = [r for r in lineas if r.glyph.line_dash]
+    assert len(discontinuas) == 3, "dp, dq y dr deben ir discontinuas"
 
 
 def test_real_csv_render(real_csv):
