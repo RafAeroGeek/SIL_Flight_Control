@@ -158,8 +158,11 @@
   (ver 5.1).
 - **Priority:** LOW (v0.3)
 
-### 8.10 Plots del canal lateral en flightreview
+### 8.10 Plots del canal lateral en flightreview ✅
 - **Task:** Graficar `dv/dp/dr/dphi`, `gyro_x/z`, `acc_y`, `SSA_deg` (otra rama).
+- **Hecho:** pestaña "Dinamica Lat-Dir" (dv/dp/dr/dphi), roll en Actitud y dp/dr
+  sobre los giros en Rapidez angular. `gyro_x/z`, `acc_y` y `SSA_deg` ya salían
+  en Sensores e Inercial.
 - **Priority:** MEDIUM
 
 ### 8.11 Typo en diapositivas: L_v del Navion
