@@ -164,3 +164,29 @@ def test_lat_dir_sin_columnas_laterales(tmp_path, synthetic_df):
     for f in col.children:
         assert "(no disponible)" in f.title.text
         assert not _lines(f)
+
+
+# --------------------------------------------------------------------------
+# Sensores / IMU: dp y dr del estado sobre el giroscopo
+# --------------------------------------------------------------------------
+from flightreview.plots import sensor_imu  # noqa: E402
+
+
+def _gyro_fig(log):
+    return sensor_imu.build(log, log_source(log), new_x_range(log)).children[0]
+
+
+def test_imu_gyro_superpone_dp_dr_dashed(synthetic_csv):
+    fig = _gyro_fig(load_log(synthetic_csv))
+    lineas = _lines(fig)
+    assert len(lineas) == 5  # gyro x/y/z + dp/dr
+    discontinuas = [r for r in lineas if r.glyph.line_dash]
+    assert len(discontinuas) == 2, "dp y dr deben ir discontinuas"
+
+
+def test_imu_gyro_sin_columnas_laterales(tmp_path, synthetic_df):
+    p = tmp_path / "solo_lon.csv"
+    synthetic_df.drop(columns=["dv_mps", "dp_radps", "dr_radps", "dphi_rad "]).to_csv(p, index=False)
+    lineas = _lines(_gyro_fig(load_log(str(p))))
+    assert len(lineas) == 3
+    assert not [r for r in lineas if r.glyph.line_dash]

@@ -85,6 +85,27 @@ def add_series(fig, source: ColumnDataSource, t_field: str, y_field: str,
     )
 
 
+def add_state_rate_overlays(fig, log: FlightLog, source: ColumnDataSource, t_field: str,
+                            specs) -> list[tuple[str, str]]:
+    """Sobrepone tasas del estado (deg/s) como lineas discontinuas.
+
+    ``specs`` es una lista de tuplas
+    (canonico, giro_del_eje, campo, etiqueta, hover, indice_color). Se omite la
+    tasa si no esta en el log o si resuelve a la misma columna que el giroscopo.
+    Devuelve los pares (campo, hover) para ``add_hover``.
+    """
+    hover_series: list[tuple[str, str]] = []
+    for canon, gyro, field, label, hover_label, ci in specs:
+        col = log.cols[canon]
+        if col is None or col == log.cols[gyro]:
+            continue
+        source.data[field] = to_deg(log.df_plot[col])
+        add_series(fig, source, t_field, field, label,
+                   SERIES_PALETTE[ci % len(SERIES_PALETTE)], dash="dashed")
+        hover_series.append((field, hover_label))
+    return hover_series
+
+
 def add_mode_background(fig, intervals: list[ModeInterval], alpha: float = 0.12) -> None:
     """Pinta una banda de color de fondo por cada tramo de modo de vuelo.
 

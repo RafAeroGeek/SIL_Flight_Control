@@ -9,7 +9,13 @@ from __future__ import annotations
 
 from flightreview.parser.loader import FlightLog
 from flightreview.parser.schema import to_deg
-from flightreview.plots.base import SERIES_PALETTE, add_hover, add_series, time_figure
+from flightreview.plots.base import (
+    SERIES_PALETTE,
+    add_hover,
+    add_series,
+    add_state_rate_overlays,
+    time_figure,
+)
 
 # (canonico, etiqueta, indice_color)
 _GYROS = [
@@ -42,14 +48,7 @@ def build(log: FlightLog, source, x_range):
         add_series(fig, source, t, field, label, SERIES_PALETTE[ci % len(SERIES_PALETTE)])
         hover_series.append((field, label))
 
-    for canon, gyro, field, label, hover_label, ci in _STATE_RATES:
-        col = log.cols[canon]
-        if col is None or col == log.cols[gyro]:
-            continue
-        source.data[field] = to_deg(log.df_plot[col])
-        add_series(fig, source, t, field, label,
-                   SERIES_PALETTE[ci % len(SERIES_PALETTE)], dash="dashed")
-        hover_series.append((field, hover_label))
+    hover_series += add_state_rate_overlays(fig, log, source, t, _STATE_RATES)
 
     if faltan:
         fig.title.text = f"Rapidez angular  (no disponible: {', '.join(faltan)})"
