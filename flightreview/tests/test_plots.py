@@ -94,12 +94,12 @@ def test_cada_builder_devuelve_figura_con_series_y_hover(synthetic_csv):
         assert m.x_range is xr
 
 
-def test_actitud_pitch_presente_roll_yaw_no(synthetic_csv):
+def test_actitud_roll_pitch_presentes_yaw_no(synthetic_csv):
     log = load_log(synthetic_csv)
     fig = PREDEFINED[0].render(log, log_source(log), new_x_range(log))
-    assert len(_lines(fig)) == 1  # solo pitch
+    assert len(_lines(fig)) == 2  # roll (dphi) + pitch (dtheta)
     assert "no disponible" in fig.title.text
-    assert "Roll" in fig.title.text and "Yaw" in fig.title.text
+    assert "Yaw" in fig.title.text and "Roll" not in fig.title.text
 
 
 def test_vibracion_tiene_modulo_y_bandas(synthetic_csv):
