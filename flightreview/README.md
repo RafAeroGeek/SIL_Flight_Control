@@ -14,6 +14,10 @@ CSV con un eje temporal y resuelve los nombres de columna de forma flexible.
 - Servidor con pestañas: **Dinámica Longitudinal** (du, dw, dq, dtheta),
   **Dinámica Lat-Dir** (dv, dp, dr, dphi), control de superficies, sensores y
   resumen.
+- Tasas del estado (dp, dq, dr) en **discontinua** sobre los giróscopos en
+  *Rapidez angular* y *Sensores / IMU* (estado verdadero frente a medición).
+- Derrape estimado `atan2(dv, V)` (V = `pitot_ms`) en discontinua sobre
+  `SSA_deg` en la gráfica de la veleta.
 - **Fondo de color según el modo de vuelo** (columna `mode`).
 - Exportación a un **reporte HTML autocontenido** (offline, sin servidor).
 

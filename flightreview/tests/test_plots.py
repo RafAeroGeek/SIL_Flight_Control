@@ -190,3 +190,42 @@ def test_imu_gyro_sin_columnas_laterales(tmp_path, synthetic_df):
     lineas = _lines(_gyro_fig(load_log(str(p))))
     assert len(lineas) == 3
     assert not [r for r in lineas if r.glyph.line_dash]
+
+
+# --------------------------------------------------------------------------
+# Sensores / Veleta: derrape estimado atan2(dv, V) junto a SSA_deg
+# --------------------------------------------------------------------------
+import numpy as np  # noqa: E402
+
+from flightreview.plots import sensor_vane  # noqa: E402
+
+
+def _vane(tmp_path, df):
+    p = tmp_path / "vane.csv"
+    df.to_csv(p, index=False)
+    log = load_log(str(p))
+    source = log_source(log)
+    return sensor_vane.build(log, source, new_x_range(log)), source
+
+
+def test_vane_superpone_beta_est_dashed(tmp_path, synthetic_df):
+    synthetic_df["pitot_ms"] = 25.0
+    fig, source = _vane(tmp_path, synthetic_df)
+    lineas = _lines(fig)
+    assert len(lineas) == 3  # AoA + SSA + beta_est
+    discontinuas = [r for r in lineas if r.glyph.line_dash]
+    assert len(discontinuas) == 1
+    esperado = np.degrees(np.arctan2(synthetic_df["dv_mps"], 25.0))
+    np.testing.assert_allclose(source.data["vane_beta_est_deg"], esperado, atol=1e-4)
+
+
+def test_vane_beta_est_nan_con_velocidad_nula(tmp_path, synthetic_df):
+    # pitot_ms = 0 en el fixture: sin velocidad no hay derrape estimado.
+    _, source = _vane(tmp_path, synthetic_df)
+    assert np.isnan(source.data["vane_beta_est_deg"]).all()
+
+
+def test_vane_sin_dv_no_dibuja_beta_est(tmp_path, synthetic_df):
+    fig, source = _vane(tmp_path, synthetic_df.drop(columns=["dv_mps"]))
+    assert len(_lines(fig)) == 2
+    assert "vane_beta_est_deg" not in source.data
