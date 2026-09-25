@@ -8,6 +8,7 @@ comparten el mismo ``x_range`` para que el eje de tiempo se mueva enlazado
 
 from __future__ import annotations
 
+from bokeh.layouts import column
 from bokeh.models import (
     BoxAnnotation,
     ColumnDataSource,
@@ -22,6 +23,7 @@ from bokeh.plotting import figure
 
 from flightreview.parser.flight_modes import ModeInterval
 from flightreview.parser.loader import FlightLog
+from flightreview.parser.schema import to_deg
 
 # Paleta estable para las series de una figura.
 SERIES_PALETTE = list(Category10_10)
@@ -83,6 +85,27 @@ def add_series(fig, source: ColumnDataSource, t_field: str, y_field: str,
     )
 
 
+def add_state_rate_overlays(fig, log: FlightLog, source: ColumnDataSource, t_field: str,
+                            specs) -> list[tuple[str, str]]:
+    """Sobrepone tasas del estado (deg/s) como lineas discontinuas.
+
+    ``specs`` es una lista de tuplas
+    (canonico, giro_del_eje, campo, etiqueta, hover, indice_color). Se omite la
+    tasa si no esta en el log o si resuelve a la misma columna que el giroscopo.
+    Devuelve los pares (campo, hover) para ``add_hover``.
+    """
+    hover_series: list[tuple[str, str]] = []
+    for canon, gyro, field, label, hover_label, ci in specs:
+        col = log.cols[canon]
+        if col is None or col == log.cols[gyro]:
+            continue
+        source.data[field] = to_deg(log.df_plot[col])
+        add_series(fig, source, t_field, field, label,
+                   SERIES_PALETTE[ci % len(SERIES_PALETTE)], dash="dashed")
+        hover_series.append((field, hover_label))
+    return hover_series
+
+
 def add_mode_background(fig, intervals: list[ModeInterval], alpha: float = 0.12) -> None:
     """Pinta una banda de color de fondo por cada tramo de modo de vuelo.
 
@@ -114,6 +137,34 @@ def mode_legend_div(intervals: list[ModeInterval]) -> Div:
         for name, color in seen.values()
     )
     return Div(text=f"<b>Modo de vuelo:</b> {chips}")
+
+
+def _state_figure(log: FlightLog, source, x_range, canon, titulo, y_label, field, es_angular, ci):
+    fig = time_figure(titulo, y_label, x_range=x_range)
+    t = log.cols.t
+    col = log.cols[canon]
+
+    if col is None:
+        fig.title.text = f"{titulo}  (no disponible)"
+        return fig
+
+    source.data[field] = to_deg(log.df_plot[col]) if es_angular else log.df_plot[col]
+    add_series(fig, source, t, field, y_label, SERIES_PALETTE[ci % len(SERIES_PALETTE)])
+    add_hover(fig, t, [(field, y_label)])
+    fig.legend.click_policy = "hide"
+    fig.legend.location = "top_left"
+    return fig
+
+
+def state_column(log: FlightLog, source, x_range, states):
+    """Una figura por estado, apiladas en columna con eje de tiempo enlazado.
+
+    ``states`` es una lista de tuplas
+    (canonico, titulo, etiqueta_eje_y, campo, es_angular, indice_color); si la
+    columna no esta en el log, la figura queda vacia con "(no disponible)".
+    """
+    figuras = [_state_figure(log, source, x_range, *s) for s in states]
+    return column(*figuras, sizing_mode="stretch_width")
 
 
 def log_source(log: FlightLog) -> ColumnDataSource:

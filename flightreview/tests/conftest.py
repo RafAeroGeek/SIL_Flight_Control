@@ -21,12 +21,14 @@ REAL_COLUMNS = [
     "pilot_roll", "pilot_pitch", "pilot_yaw", "pilot_throttle",
     "mode", "arm",
     "du_mps", "dw_mps", "dq_radps", "dtheta_rad",
-    "pitot_ms",
+    "pitot_ms", "AoA_deg", "SSA_deg",
     "gyro_x_radps", "gyro_y_radps", "gyro_z_radps",
     "acc_x_mps2", "acc_y_mps2", "acc_z_mps2",
     "gps_lat_deg", "gps_lon_deg", "gps_alt_m",
     "gps_vn_ms", "gps_ve_ms", "gps_vd_ms",
-    "laser_alt_m ",  # <-- espacio final deliberado
+    "laser_alt_m",
+    "dv_mps", "dp_radps", "dr_radps",
+    "dphi_rad ",  # <-- espacio final deliberado
 ]
 
 N_ROWS = 60
@@ -59,6 +61,11 @@ def synthetic_df() -> pd.DataFrame:
     data["acc_x_mps2"] = 0.5 * np.sin(2 * np.pi * 5.0 * t)
     data["acc_y_mps2"] = 0.3 * np.cos(2 * np.pi * 7.0 * t)
     data["acc_z_mps2"] = -9.81 + 0.2 * np.sin(2 * np.pi * 11.0 * t)
+    # Estado lateral-direccional.
+    data["dv_mps"] = 0.5 * np.sin(2 * np.pi * 0.5 * t)
+    data["dp_radps"] = 0.10 * np.cos(2 * np.pi * 0.5 * t)
+    data["dr_radps"] = -0.05 * np.sin(2 * np.pi * 0.5 * t)
+    data["dphi_rad "] = 0.05 * np.sin(2 * np.pi * 0.5 * t)
     return pd.DataFrame(data, columns=REAL_COLUMNS)
 
 

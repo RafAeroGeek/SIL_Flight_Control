@@ -94,12 +94,12 @@ def test_cada_builder_devuelve_figura_con_series_y_hover(synthetic_csv):
         assert m.x_range is xr
 
 
-def test_actitud_pitch_presente_roll_yaw_no(synthetic_csv):
+def test_actitud_roll_pitch_presentes_yaw_no(synthetic_csv):
     log = load_log(synthetic_csv)
     fig = PREDEFINED[0].render(log, log_source(log), new_x_range(log))
-    assert len(_lines(fig)) == 1  # solo pitch
+    assert len(_lines(fig)) == 2  # roll (dphi) + pitch (dtheta)
     assert "no disponible" in fig.title.text
-    assert "Roll" in fig.title.text and "Yaw" in fig.title.text
+    assert "Yaw" in fig.title.text and "Roll" not in fig.title.text
 
 
 def test_vibracion_tiene_modulo_y_bandas(synthetic_csv):
@@ -112,12 +112,13 @@ def test_vibracion_tiene_modulo_y_bandas(synthetic_csv):
     assert len(_lines(fig)) == 4  # acc x/y/z + |a|
 
 
-def test_angular_rate_incluye_dq_dashed(synthetic_csv):
+def test_angular_rate_incluye_dp_dq_dr_dashed(synthetic_csv):
     log = load_log(synthetic_csv)
     fig = PREDEFINED[1].render(log, log_source(log), new_x_range(log))
-    dashes = {tuple(r.glyph.line_dash) if r.glyph.line_dash else () for r in _lines(fig)}
-    assert len(_lines(fig)) == 4  # gyro x/y/z + dq
-    assert any(d for d in dashes), "dq debe ir discontinua"
+    lineas = _lines(fig)
+    assert len(lineas) == 6  # gyro x/y/z + dp/dq/dr
+    discontinuas = [r for r in lineas if r.glyph.line_dash]
+    assert len(discontinuas) == 3, "dp, dq y dr deben ir discontinuas"
 
 
 def test_real_csv_render(real_csv):
@@ -125,3 +126,106 @@ def test_real_csv_render(real_csv):
     models, _ = render_all(log)
     assert len(models) == 3
     assert all(_lines(m) for m in models)
+
+
+# --------------------------------------------------------------------------
+# Pestana Dinamica Lat-Dir
+# --------------------------------------------------------------------------
+from flightreview.plots import lat_dir_dynamics  # noqa: E402
+from flightreview.plots.registry import PlotGroup  # noqa: E402
+
+
+def _lat_dir(log):
+    xr = new_x_range(log)
+    return PlotGroup("Estados", lat_dir_dynamics.build).render(log, log_source(log), xr), xr
+
+
+def test_lat_dir_cuatro_figuras(synthetic_csv):
+    log = load_log(synthetic_csv)
+    col, xr = _lat_dir(log)
+    figs = col.children
+    assert [f.title.text for f in figs] == [
+        "Velocidad lateral (dv)", "Tasa de alabeo (dp)",
+        "Tasa de guinada (dr)", "Angulo de alabeo (dphi)",
+    ]
+    for f in figs:
+        assert len(_lines(f)) == 1
+        assert any(isinstance(t, HoverTool) for t in f.tools)
+        assert f.x_range is xr
+        # 3 tramos de modo 0->1->0
+        assert len([r for r in f.renderers if isinstance(r, BoxAnnotation)]) == 3
+
+
+def test_lat_dir_sin_columnas_laterales(tmp_path, synthetic_df):
+    # CSV longitudinal (p. ej. linea base previa a v0.2-lateral).
+    p = tmp_path / "solo_lon.csv"
+    synthetic_df.drop(columns=["dv_mps", "dp_radps", "dr_radps", "dphi_rad "]).to_csv(p, index=False)
+    col, _ = _lat_dir(load_log(str(p)))
+    for f in col.children:
+        assert "(no disponible)" in f.title.text
+        assert not _lines(f)
+
+
+# --------------------------------------------------------------------------
+# Sensores / IMU: dp y dr del estado sobre el giroscopo
+# --------------------------------------------------------------------------
+from flightreview.plots import sensor_imu  # noqa: E402
+
+
+def _gyro_fig(log):
+    return sensor_imu.build(log, log_source(log), new_x_range(log)).children[0]
+
+
+def test_imu_gyro_superpone_dp_dr_dashed(synthetic_csv):
+    fig = _gyro_fig(load_log(synthetic_csv))
+    lineas = _lines(fig)
+    assert len(lineas) == 5  # gyro x/y/z + dp/dr
+    discontinuas = [r for r in lineas if r.glyph.line_dash]
+    assert len(discontinuas) == 2, "dp y dr deben ir discontinuas"
+
+
+def test_imu_gyro_sin_columnas_laterales(tmp_path, synthetic_df):
+    p = tmp_path / "solo_lon.csv"
+    synthetic_df.drop(columns=["dv_mps", "dp_radps", "dr_radps", "dphi_rad "]).to_csv(p, index=False)
+    lineas = _lines(_gyro_fig(load_log(str(p))))
+    assert len(lineas) == 3
+    assert not [r for r in lineas if r.glyph.line_dash]
+
+
+# --------------------------------------------------------------------------
+# Sensores / Veleta: derrape estimado atan2(dv, V) junto a SSA_deg
+# --------------------------------------------------------------------------
+import numpy as np  # noqa: E402
+
+from flightreview.plots import sensor_vane  # noqa: E402
+
+
+def _vane(tmp_path, df):
+    p = tmp_path / "vane.csv"
+    df.to_csv(p, index=False)
+    log = load_log(str(p))
+    source = log_source(log)
+    return sensor_vane.build(log, source, new_x_range(log)), source
+
+
+def test_vane_superpone_beta_est_dashed(tmp_path, synthetic_df):
+    synthetic_df["pitot_ms"] = 25.0
+    fig, source = _vane(tmp_path, synthetic_df)
+    lineas = _lines(fig)
+    assert len(lineas) == 3  # AoA + SSA + beta_est
+    discontinuas = [r for r in lineas if r.glyph.line_dash]
+    assert len(discontinuas) == 1
+    esperado = np.degrees(np.arctan2(synthetic_df["dv_mps"], 25.0))
+    np.testing.assert_allclose(source.data["vane_beta_est_deg"], esperado, atol=1e-4)
+
+
+def test_vane_beta_est_nan_con_velocidad_nula(tmp_path, synthetic_df):
+    # pitot_ms = 0 en el fixture: sin velocidad no hay derrape estimado.
+    _, source = _vane(tmp_path, synthetic_df)
+    assert np.isnan(source.data["vane_beta_est_deg"]).all()
+
+
+def test_vane_sin_dv_no_dibuja_beta_est(tmp_path, synthetic_df):
+    fig, source = _vane(tmp_path, synthetic_df.drop(columns=["dv_mps"]))
+    assert len(_lines(fig)) == 2
+    assert "vane_beta_est_deg" not in source.data

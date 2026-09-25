@@ -22,16 +22,20 @@ def test_resolve_columns_mapea_canonicos(synthetic_df):
     assert cmap.acc_z == "acc_z_mps2"
     assert cmap.mode == "mode"
     assert cmap.arm == "arm"
+    # Estado lateral-direccional (dphi_rad llega con espacio final en el CSV).
+    assert cmap.dv == "dv_mps"
+    assert cmap.roll_rate == "dp_radps"
+    assert cmap.yaw_rate == "dr_radps"
 
 
 def test_resolve_columns_faltantes_son_none(synthetic_df):
     cmap = resolve_columns(synthetic_df)
-    # El simulador es longitudinal: no hay roll ni yaw ni setpoints.
-    assert cmap.roll is None
+    # No hay yaw ni setpoints de actitud.
     assert cmap.yaw is None
     assert cmap.pitch_sp is None
+    assert cmap.roll_sp is None
     assert cmap.has("pitch", "gyro_y") is True
-    assert cmap.has("pitch", "roll") is False
+    assert cmap.has("pitch", "yaw") is False
 
 
 def test_require_time_column_error_claro():

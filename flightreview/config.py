@@ -24,8 +24,8 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "arm": ["arm", "armed", "arm_switch"],
 
     # --- Actitud estimada (rad) ---
-    # El simulador es longitudinal: hoy solo existe pitch como dtheta_rad.
-    "roll": ["roll_rad", "roll", "phi_rad", "phi"],
+    # El simulador registra pitch como dtheta_rad y roll como dphi_rad; yaw aun no.
+    "roll": ["dphi_rad", "dphi", "roll_rad", "roll", "phi_rad", "phi"],
     "pitch": ["dtheta_rad", "dtheta", "pitch_rad", "pitch", "theta_rad", "theta"],
     "yaw": ["yaw_rad", "yaw", "psi_rad", "psi"],
 
@@ -57,6 +57,12 @@ FIELD_ALIASES: dict[str, list[str]] = {
     # --- Estados longitudinales SIL (m/s) ---
     "du": ["du_mps"],
     "dw": ["dw_mps"],
+
+    # --- Estados lateral-direccionales SIL (m/s, rad/s) ---
+    # dphi se resuelve como "roll" (ver actitud).
+    "dv": ["dv_mps"],
+    "roll_rate": ["dp_radps", "dp", "roll_rate_radps"],
+    "yaw_rate": ["dr_radps", "dr", "yaw_rate_radps"],
 
     # --- Mando del piloto (normalizado) ---
     "pilot_roll": ["pilot_roll"],

@@ -9,10 +9,11 @@ from flightreview.parser.loader import _cache_path, load_log
 def test_carga_basica_y_limpieza(synthetic_csv):
     log = load_log(synthetic_csv)
     assert log.n_samples == 60
-    assert log.df.shape[1] == 42
-    # El espacio final de 'laser_alt_m ' debe quedar limpio.
-    assert "laser_alt_m" in log.df.columns
-    assert "laser_alt_m " not in log.df.columns
+    assert log.df.shape[1] == 48
+    # El espacio final de 'dphi_rad ' debe quedar limpio.
+    assert "dphi_rad" in log.df.columns
+    assert "dphi_rad " not in log.df.columns
+    assert log.cols.roll == "dphi_rad"
     # Columnas de coma flotante reducidas a float32.
     assert log.df["dtheta_rad"].dtype == "float32"
 

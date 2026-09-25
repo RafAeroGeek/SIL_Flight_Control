@@ -11,6 +11,13 @@ CSV con un eje temporal y resuelve los nombres de columna de forma flexible.
 - Gráficas interactivas Bokeh: **zoom con scroll**, **pan** sobre el tiempo,
   **hover** con valor + timestamp; eje de tiempo **enlazado** entre todas.
 - Gráficas predefinidas: **actitud**, **rapidez angular**, **vibración**.
+- Servidor con pestañas: **Dinámica Longitudinal** (du, dw, dq, dtheta),
+  **Dinámica Lat-Dir** (dv, dp, dr, dphi), control de superficies, sensores y
+  resumen.
+- Tasas del estado (dp, dq, dr) en **discontinua** sobre los giróscopos en
+  *Rapidez angular* y *Sensores / IMU* (estado verdadero frente a medición).
+- Derrape estimado `atan2(dv, V)` (V = `pitot_ms`) en discontinua sobre
+  `SSA_deg` en la gráfica de la veleta.
 - **Fondo de color según el modo de vuelo** (columna `mode`).
 - Exportación a un **reporte HTML autocontenido** (offline, sin servidor).
 
@@ -48,7 +55,8 @@ flightreview/            (paquete importable: layout plano)
 
 ## Pendientes conocidos
 
-- El simulador es longitudinal: de Roll/Pitch/Yaw solo hay pitch (`dtheta_rad`).
+- De Roll/Pitch/Yaw hay roll (`dphi_rad`) y pitch (`dtheta_rad`); yaw (`dpsi`)
+  aún no es un estado del simulador.
 - Los setpoints de actitud aún no se registran en el CSV (trazas cableadas y
   vacías).
 - `mode` es constante `0` en los datos actuales; el fondo por modo se ve como
