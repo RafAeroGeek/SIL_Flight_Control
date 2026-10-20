@@ -258,6 +258,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
      float flaps_cmd    = rc_sim.s[RC_CH_FLAPS];
      int mode_cmd       = (int)rc_sim.s[RC_CH_MODE];
      bool arm_cmd       = (rc_sim.s[RC_CH_ARM] > 0.5f);
+     (void)flaps_cmd; (void)mode_cmd; (void)arm_cmd;  // reservados para flight_management (v0.3)
 
      /* Enviar comandos a los servos/actuadores */
      Servos_SetCmdDeltaUs(SERVO_AILERON, aile_cmd);   // Roll
@@ -389,6 +390,7 @@ static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
 {
     (void)now_ms;
     const float dt_s = (float)dt_ms * 0.001f;
+    (void)dt_s;  // se usara en los inner loops (v0.3)
 
     /* Inner loops (rate) o “control layer” rápida */
 
