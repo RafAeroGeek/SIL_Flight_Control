@@ -2,7 +2,7 @@
 ## Fase 2: Lateral-Directional Dynamics Integration
 
 **Generado:** 2026-09-09  
-**Actualizado:** 2026-09-23 (v0.2-lateral, rama `dinamica-lateral-dir-sensores`)  
+**Actualizado:** 2026-10-20 (cierre de v0.2-lateral)  
 **Estatus:** Dinámica lateral-direccional lineal integrada (placeholders Navion)
 
 ---
@@ -49,11 +49,13 @@
 ## SECTION 4: Sensor Integration
 
 ### 4.1 Fix pitot model (altitude/TAS/IAS)
-- **Task:** Correct pitot tube model in `src/sensors/pitot.c`
-  - Bug: Fixed sea-level density vs. altitude (should vary with altitude)
+- **Task:** Correct pitot tube model in `SensorsSim_UpdatePitot` (`src/sensors_sim.c`)
+  - Bug: Fixed sea-level density vs. altitude (should vary with altitude;
+    hoy `rho0 = 1.225` fijo)
   - Bug: TAS/IAS convention mixing
   - Bug: Noise model applied to velocity instead of pressure
-- **Files:** `src/sensors/pitot.c`, `src/sensors/pitot.h`
+- **Files:** `src/sensors_sim.c`, `src/sensors_sim.h`
+- **Note:** cambia la línea base de regresión (agrupar con 8.6 y 8.7)
 - **Reference:** Standard atmosphere model (density decay)
 - **Acceptance:** 
   - Density decreases with altitude (verify at 1000m vs. 5000m)
@@ -78,11 +80,12 @@
 
 ## SECTION 6: Code Quality & CI/CD
 
-### 6.1 Resolve remaining compiler warnings
+### 6.1 Resolve remaining compiler warnings ✅
 - **Task:** Audit `-Wall` output across all .c files, fix warnings
 - **Files:** `src/**/*.c`, `test/**/*.c`
 - **Acceptance:** `cmake --build build -- -Wall` produces 0 warnings
-- **Status:** 8 warnings left (v0.2 removed `g_A_lon`/`g_B_lon`)
+- **Hecho (2026-10-20):** 0 warnings. Variables reservadas de `main.c` con
+  `(void)`; andamiaje de `flight_management.c` con `FM_UNUSED` hasta v0.3.
 - **Priority:** MEDIUM
 - **Estimate:** 1.5h
 
