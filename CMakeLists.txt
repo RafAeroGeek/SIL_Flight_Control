@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(SIL_Flight_Control
-        VERSION 0.1.0
-        DESCRIPTION "Simulador SIL de control de vuelo (dinamica longitudinal + sensores)"
+        VERSION 0.2.0
+        DESCRIPTION "Simulador SIL de control de vuelo (dinamica longitudinal + lateral-direccional + sensores)"
         LANGUAGES C)
 
 # El .cbp original usaba gcc con -Wall, -g en Debug y -O2 en Release.
