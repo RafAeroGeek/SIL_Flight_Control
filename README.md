@@ -36,7 +36,7 @@ SIL_Flight_Control/
 | `servo_sim`            | Servos de 1er orden con RK4 y limitador de velocidad  |
 | `flight_sim`           | Planta: estado, actuadores, paso de integración       |
 | `dynamics`             | Matrices A/B lon y lat, RK4 (4x1 y n/m), señales      |
-| `dynamic_models`       | Catálogo de modelos (`aircraft_a`, `aircraft_b`)      |
+| `aircraft_loader`      | Carga parámetros y config de servos desde el JSON     |
 | `sensors_sim`          | Pitot, veleta (α, β), IMU, GPS y láser, ruido y bias  |
 | `flight_management`    | Capa de control (**tipos definidos, sin implementar**)|
 | `sim_PWM_processing`   | Banco de canales PWM (compilado, aún sin usar)        |
@@ -186,10 +186,6 @@ El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad`.
 - `flight_management.c` está prácticamente vacío: `FM_Init`, `FM_Update` y los
   tres tiers de control están declarados pero no implementados. Las tareas de
   5, 30, 150 y 500 ms en `main.c` tampoco hacen nada todavía.
-- Los índices de servo de `main.c` (`ELEVATOR=0, AILERON=1, RUDDER=2,
-  THROTTLE=3`) no coinciden con la tabla de configuración de `servo_sim.c`
-  (`Elevator, Aileron L, Aileron R, Rudder`). El "throttle" usa hoy la
-  constante de tiempo del rudder.
-- `SERVO_FLAPS = 4` queda fuera de rango (`SERVO_SIM_N_SERVOS = 4`); el clamp
-  lo descarta en silencio.
+- El throttle no realimenta la planta, y su `tau`/`rate_limit` de ESC en
+  `servo_sim.c` son valores propuestos sin datos de banco.
 - `sim_PWM_processing` se compila pero nadie lo llama.
