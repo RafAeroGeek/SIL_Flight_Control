@@ -181,8 +181,17 @@ def calcular_coeficientes(datos: dict, aux: dict) -> dict:
     Cnb = (0.2 * eta_v * V_v * CLa_v
            + eta_v * V_v * CLa_v * (1 + ds_db))
 
+    # Posición vertical del ala (DATCOM 5.2.1.1):
+    #   ΔClβ_zw = 1.2 √AR (z_w/b)(2 D_f/b)   [1/rad]
+    #   z_w: eje del fuselaje → raíz del ala, negativo con ala alta (estabiliza)
+    #   D_f: altura/diámetro promedio del fuselaje. Sin datos → 0.
+    z_w = a.get("z_w_m", 0.0)
+    D_f = a.get("D_f_m", 0.0)
+    dClb_zw = 1.2 * math.sqrt(AR) * (z_w / b) * (2 * D_f / b)
+
     # Nelson: ΔClβ_v = CYβ_v · z_v/b  (CYβ_v ya incluye η S_v/S)
     Clb = (-0.5 * CLa_w * Gamma * Z_lam * math.cos(Lam14)**2
+           + dClb_zw
            + CYb_tail * z_v / b)
 
     # ── Derivadas en p ───────────────────────────────────────────────────────

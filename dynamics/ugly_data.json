@@ -20,7 +20,9 @@
     "b2_m"   : 1.2,
     "Gamma_deg"    : 0.0,
     "Lambda_deg"   : 0.0,
-    "Lambda14_deg" : 0.0
+    "Lambda14_deg" : 0.0,
+    "z_w_m"  : -0.1,
+    "D_f_m"  : 0.25
   },
 
   "cola_vertical": {
