@@ -11,8 +11,8 @@
 /* Replica de g_cfg[] en servo_sim.c (lineas 22-33). Si cambian los defaults
    compilados, actualizar esta tabla tambien: el test lo detecta. */
 static const ServoCfg_s kExpectedDefault[SERVO_SIM_N_SERVOS] = {
-    [SERVO_ELEVATOR] = {0.01f, 0.18f,  0.001f, 0.0f, -25.0f, 25.0f, 900.0f},
-    [SERVO_AILERON]  = {0.01f, 0.18f,  0.001f, 0.0f, -20.0f, 20.0f, 300.0f},
+    [SERVO_ELEVATOR] = {0.05f, 0.18f,  0.001f, 0.0f, -25.0f, 25.0f, 900.0f},
+    [SERVO_AILERON]  = {0.05f, 0.18f,  0.001f, 0.0f, -20.0f, 20.0f, 300.0f},
     [SERVO_RUDDER]   = {0.07f, 0.18f,  0.001f, 0.0f, -30.0f, 30.0f, 250.0f},
     [SERVO_THROTTLE] = {0.20f, 0.002f, 0.001f, 0.0f,   0.0f,  1.0f,   2.0f},
 };

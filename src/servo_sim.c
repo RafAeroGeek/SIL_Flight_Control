@@ -19,8 +19,8 @@ static float   g_y_out_deg[SERVO_SIM_N_SERVOS];
 static const ServoCfg_s g_cfg[] =
 {
     //                    tau     k(deg/us) dt      y0     ymin    ymax    rate(dps)
-    [SERVO_ELEVATOR] =   {0.01f,  0.18f,    0.001f,  0.0f, -25.0f,  25.0f, 900.0f},
-    [SERVO_AILERON]  =   {0.01f,  0.18f,    0.001f,  0.0f, -20.0f,  20.0f, 300.0f},
+    [SERVO_ELEVATOR] =   {0.05f,  0.18f,    0.001f,  0.0f, -25.0f,  25.0f, 900.0f},
+    [SERVO_AILERON]  =   {0.05f,  0.18f,    0.001f,  0.0f, -20.0f,  20.0f, 300.0f},
     [SERVO_RUDDER]   =   {0.07f,  0.18f,    0.001f,  0.0f, -30.0f,  30.0f, 250.0f},
     /* Canal throttle: la entrada llega en microsegundos como los demas canales
        (Servos_SetCmdDeltaUs), centro 1500 us y recorrido +/-500 us. k = 1/500
