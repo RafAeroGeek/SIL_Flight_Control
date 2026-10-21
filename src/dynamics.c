@@ -12,16 +12,21 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+/*
+ * Longitudinal en ejes cuerpo: x = [du, dw, dq, dtheta]. Con w0 != 0 la
+ * ecuacion de X lleva -w0*dq (du/dt = ... - w0 q) y el elevador tiene
+ * componente en X (X_de); con w0 = 0 y X_de = 0 queda la forma de Nelson.
+ */
 void build_state_space_matrices(const Params *p, double A[4][4], double B[4])
 {
     // Matriz A
-    A[0][0] = p->X_u;      A[0][1] = p->X_w;      A[0][2] = 0.0;       A[0][3] = p->X_theta;
+    A[0][0] = p->X_u;      A[0][1] = p->X_w;      A[0][2] = -p->w0_ms; A[0][3] = p->X_theta;
     A[1][0] = p->Z_u_hat;  A[1][1] = p->Z_w_hat;  A[1][2] = p->u0_ms;  A[1][3] = p->Z_theta;
     A[2][0] = p->M_u_hat;  A[2][1] = p->M_w_hat;  A[2][2] = p->M_q_hat;A[2][3] = 0.0;
     A[3][0] = 0.0;         A[3][1] = 0.0;         A[3][2] = 1.0;       A[3][3] = 0.0;
 
-    // Matriz B (4x1) – usando Z_de y M_de directamente (como en tu ejemplo)
-    B[0] = 0.0;
+    // Matriz B (4x1)
+    B[0] = p->X_de;
     B[1] = p->Z_de;
     B[2] = p->M_de;
     B[3] = 0.0;

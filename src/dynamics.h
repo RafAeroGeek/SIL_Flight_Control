@@ -17,10 +17,11 @@ typedef struct {
     float gamma0_deg;   // ángulo de trayectoria inicial [deg]
     float masa_kg;      // masa [kg]
 
-    // Derivadas dimensionales (longitudinal)
+    // Derivadas dimensionales (longitudinal), ejes cuerpo
     float X_u;
     float X_w;
     float X_theta;
+    float X_de;         // [m/s^2] = -sin(alpha_trim)*Z_de de estabilidad
 
     float Z_u_hat;
     float Z_w_hat;

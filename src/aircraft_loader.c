@@ -10,7 +10,7 @@
 static const Params kDefaultParams = {
     .name = "DEFAULT",
     .Alt_m = 0.0f, .V0_ms = 1.0f, .gamma0_deg = 0.0f, .masa_kg = 1.0f,
-    .X_u = 0.0f, .X_w = 0.0f, .X_theta = 0.0f,
+    .X_u = 0.0f, .X_w = 0.0f, .X_theta = 0.0f, .X_de = 0.0f,
     .Z_u_hat = 0.0f, .Z_w_hat = 0.0f, .u0_ms = 1.0f, .w0_ms = 0.0f,
     .Z_theta = 0.0f, .Z_de = 0.0f,
     .M_u_hat = 0.0f, .M_w_hat = 0.0f, .M_q_hat = 0.0f, .M_de = 0.0f,
@@ -48,6 +48,7 @@ static const FloatField kFloatFields[] = {
     { "X_u",               offsetof(Params, X_u),                false },
     { "X_w",               offsetof(Params, X_w),                false },
     { "X_theta",           offsetof(Params, X_theta),            false },
+    { "X_de",              offsetof(Params, X_de),               false },
     { "Z_u_hat",           offsetof(Params, Z_u_hat),            false },
     { "Z_w_hat",           offsetof(Params, Z_w_hat),            false },
     { "u0_ms",             offsetof(Params, u0_ms),              false },
