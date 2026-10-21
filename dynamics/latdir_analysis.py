@@ -519,7 +519,6 @@ def ensamblar_resultados(datos: dict,
     return {
         "aeronave"   : aeronave,
         "descripcion": datos.get("descripcion", ""),
-        "fecha_calculo": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 
         "condicion_vuelo": {
             "rho_kg_m3"      : aux["rho_kg_m3"],
@@ -601,7 +600,8 @@ def imprimir_resumen(res: dict) -> None:
     sep = "─" * 60
     print(f"\n{'═'*60}")
     print(f"  Análisis lateral-direccional — {res['aeronave'].upper()}")
-    print(f"  {res['fecha_calculo']}")
+    # La fecha solo va a consola: en el JSON haría que cambie en cada corrida
+    print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'═'*60}")
 
     cv = res["condicion_vuelo"]
