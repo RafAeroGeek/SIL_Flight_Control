@@ -35,7 +35,7 @@ typedef struct {
     float M_q_hat;
     float M_de;
     // Derivadas dimensionales (lateral)
-    // Nelson cap. 5, ejes de estabilidad. L_x = Q*S*b*C_lx/I_x y
+    // Nelson cap. 5, en ejes cuerpo. L_x = Q*S*b*C_lx/I_x y
     // N_x = Q*S*b*C_nx/I_z (sin asterisco: la correccion por I_xz se hace en C).
     float theta0_deg;   // angulo de cabeceo de trim [deg]
     float I_x;          // [kg*m^2]
