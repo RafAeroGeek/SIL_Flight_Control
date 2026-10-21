@@ -104,11 +104,12 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
     r_x = ini["radio_giro_x_adim"]
     Ix  = (b**2 * m * r_x**2) / 4
 
-    # Guiñada: I_z = m * R_z^2,  R_z = r_z * L_ref
+    # Guiñada (Roskam): I_z = m * (e * R_z / 2)^2,  e = L_ref = (b + l_f)/2
+    #   →  I_z = m * R_z^2 / 4,  R_z = r_z * L_ref
     r_z   = ini["radio_giro_z_adim"]
     L_ref = (b + l_f) / 2
     R_z   = r_z * L_ref
-    Iz    = m * R_z**2
+    Iz    = (m * R_z**2) / 4
 
     return {
         "rho_kg_m3"   : rho,
