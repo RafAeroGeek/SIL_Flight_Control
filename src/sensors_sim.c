@@ -127,15 +127,12 @@ static double sensors_get_theta_rad(const FlightSim *sim)
     /*
      * Tu estado X[3] = dtheta.
      *
-     * Primera aproximación:
-     * theta = gamma0 + dtheta
-     *
-     * Más adelante puedes usar:
-     * theta = alpha_trim + gamma0 + dtheta
+     * theta = theta0 + dtheta, con theta0 = alpha_trim + gamma0 (ejes
+     * cuerpo), el mismo theta0 de la matriz lateral.
      */
-    double gamma0_rad = deg2rad((double)sim->params.gamma0_deg);
+    double theta0_rad = deg2rad((double)sim->params.theta0_deg);
 
-    return gamma0_rad + sim->X_lon[3];
+    return theta0_rad + sim->X_lon[3];
 }
 
 static double sensors_get_v_body_ms(const FlightSim *sim)
