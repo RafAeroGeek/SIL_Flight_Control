@@ -110,4 +110,13 @@ if(SIL_BUILD_TESTS)
     target_compile_options(test_lateral_matrices PRIVATE -Wall)
     target_link_libraries(test_lateral_matrices PRIVATE m)
     add_test(NAME test_lateral_matrices COMMAND test_lateral_matrices)
+
+    add_executable(test_lon_matrices
+        test/test_lon_matrices.c
+        src/dynamics.c
+    )
+    target_include_directories(test_lon_matrices PRIVATE src test)
+    target_compile_options(test_lon_matrices PRIVATE -Wall)
+    target_link_libraries(test_lon_matrices PRIVATE m)
+    add_test(NAME test_lon_matrices COMMAND test_lon_matrices)
 endif()

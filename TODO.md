@@ -124,7 +124,8 @@
 - **Task:** Cargar en `aircraft/ugly_stick.json` las derivadas laterales reales
   (desde MATLAB) y las de `aircraft/aircraft_a.json`.
 - **Hecho (ugly_stick, 2026-10-20):** estimadas con `dynamics/latdir_analysis.py`
-  (Nelson; ala alta DATCOM) y escritas con `dynamics/latdir_a_aircraft.py`.
+  (Nelson; ala alta DATCOM) y escritas con `dynamics/a_aircraft.py` (antes
+  `latdir_a_aircraft.py`; desde 2026-10-21 también el longitudinal, en ejes cuerpo).
   `aircraft_a.json` sigue con placeholders del Navion.
 - **Note:** Los valores originales de `aircraft_a` eran `L_da = 4.66`, `L_p = -1.30`.
 - **Priority:** HIGH
@@ -142,14 +143,12 @@
 - **Task:** Agregar dpsi -> GPS `ve` distinto de 0 y heading hold.
 - **Priority:** MEDIUM
 
-### 8.5 Término w0 de ejes cuerpo en la fuerza lateral
-- **Task:** El lateral está en ejes de estabilidad; se desprecia `+w0*dp`.
-- **Priority:** LOW
+### 8.5 Término w0 de ejes cuerpo en la fuerza lateral ✅
+- **Hecho (2026-10-21):** lon y lat en ejes cuerpo: `-w0·dq` y `X_de` en el
+  longitudinal, `+w0·dp` y `tan(θ0)·dr` en el lateral.
 
-### 8.6 theta de sensores vs theta0 del modelo lateral
-- **Task:** `sensors_get_theta_rad` usa `gamma0 + dtheta`; la matriz lateral usa
-  `theta0_deg` (= gamma0 + alpha0). Unificar (cambia la línea base).
-- **Priority:** LOW
+### 8.6 theta de sensores vs theta0 del modelo lateral ✅
+- **Hecho (2026-10-21):** sensores con `θ = θ0 + dθ` y `w = w0 + dw`.
 
 ### 8.7 Ruido en la veleta de beta
 - **Task:** Agregar ruido a `SideSlipAngle_deg` en un solo commit que regenere la
@@ -180,10 +179,25 @@
 
 ### 8.12 Validar derivadas e inercias del Ugly Stick
 - **Task:** Las inercias salen de radios de giro de aviones reales y varios
-  factores son empíricos (`K_v`, `η_v`, el término `0.2·η·V_v·CLα_v` de Cnβ);
-  no se modela el fuselaje (Cnβ, Cnr). Medir I_x/I_z con péndulo bifilar y
-  ajustar Cnr/Clβ con datos de vuelo (respuesta a dobletes).
+  factores son empíricos (`K_v`, `η_v`, el término `0.2·η·V_v·CLα_v` de Cnβ;
+  `τ = √(S_e/S_ht)`, `η_ht`, `CL_u`, `CD_u`, `CM_u` en el longitudinal);
+  no se modela el fuselaje (Cnβ, Cnr). Medir I_x/I_y/I_z con péndulo bifilar y
+  ajustar Cnr/Clβ y Cmq con datos de vuelo (respuesta a dobletes).
 - **Priority:** MEDIUM
+
+### 8.13 Trim del elevador
+- **Task:** `lon_analysis.py` calcula δe_trim (−0.49° en el Ugly Stick) pero
+  `delta_e_trim_deg` queda en 0: `flight_sim.c` mete el elevador absoluto como
+  perturbación, así que un trim ≠ 0 arrancaría el avión perturbado. Restar el
+  trim antes de la planta y luego escribirlo desde `a_aircraft.py`.
+- **Priority:** MEDIUM
+
+### 8.14 aircraft_a.json en ejes cuerpo
+- **Task:** Sus derivadas longitudinales son manuales y las laterales del
+  Navion (ejes de estabilidad), pero desde 2026-10-21 el C las integra en ejes
+  cuerpo (`w0_ms = 4.71` ahora entra en `-w0·dq`, `+w0·dp` y sensores).
+  Regenerarla con `dynamics/` o poner `w0_ms = 0` y `theta0_deg = gamma0_deg`.
+- **Priority:** LOW
 
 ---
 

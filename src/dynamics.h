@@ -17,10 +17,11 @@ typedef struct {
     float gamma0_deg;   // ángulo de trayectoria inicial [deg]
     float masa_kg;      // masa [kg]
 
-    // Derivadas dimensionales (longitudinal)
+    // Derivadas dimensionales (longitudinal), ejes cuerpo
     float X_u;
     float X_w;
     float X_theta;
+    float X_de;         // [m/s^2] = -sin(alpha_trim)*Z_de de estabilidad
 
     float Z_u_hat;
     float Z_w_hat;
@@ -34,7 +35,7 @@ typedef struct {
     float M_q_hat;
     float M_de;
     // Derivadas dimensionales (lateral)
-    // Nelson cap. 5, ejes de estabilidad. L_x = Q*S*b*C_lx/I_x y
+    // Nelson cap. 5, en ejes cuerpo. L_x = Q*S*b*C_lx/I_x y
     // N_x = Q*S*b*C_nx/I_z (sin asterisco: la correccion por I_xz se hace en C).
     float theta0_deg;   // angulo de cabeceo de trim [deg]
     float I_x;          // [kg*m^2]

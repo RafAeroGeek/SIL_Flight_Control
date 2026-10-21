@@ -5,9 +5,14 @@
  *   - correccion por I_xz != 0 contra calculo a mano (1.2)
  *   - I_x = 0 no produce NaN/Inf
  *   - respuesta libre acotada y espiral estable (rk4_step_n)
+ *   - ejes cuerpo: +w0 en A[0][1] y tan(theta0) en A[3][2]
  * =========================================================== */
 #include "dynamics.h"
 #include "test_util.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 #define EXPECT_NEAR(a, b, tol) do {                                           \
     double _a = (double)(a);                                                  \
@@ -136,11 +141,28 @@ static void test_respuesta_libre_navion(void)
            X[3], max_v, max_p, max_r);
 }
 
+/* T5: ejes cuerpo, w0 = 2.6 m/s y theta0 = 6 deg */
+static void test_ejes_cuerpo(void)
+{
+    Params p = navion();
+    p.w0_ms = 2.6f; p.theta0_deg = 6.0f;
+
+    double A[4][4], B[4][2];
+    build_lateral_matrices(&p, A, B);
+
+    const double th = (double)6.0f * M_PI / 180.0;
+    EXPECT_NEAR(A[0][1], (double)0.0f + (double)2.6f, 1e-12);
+    EXPECT_NEAR(A[3][2], tan(th), 1e-12);
+    EXPECT_NEAR(A[0][3], 9.81 * cos(th), 1e-12);
+    EXPECT_TRUE(A[3][1] == 1.0);
+}
+
 int main(void)
 {
     test_navion_ixz_cero();
     test_correccion_ixz();
     test_ix_cero();
     test_respuesta_libre_navion();
+    test_ejes_cuerpo();
     TEST_RETURN();
 }

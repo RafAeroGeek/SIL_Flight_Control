@@ -12,16 +12,21 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+/*
+ * Longitudinal en ejes cuerpo: x = [du, dw, dq, dtheta]. Con w0 != 0 la
+ * ecuacion de X lleva -w0*dq (du/dt = ... - w0 q) y el elevador tiene
+ * componente en X (X_de); con w0 = 0 y X_de = 0 queda la forma de Nelson.
+ */
 void build_state_space_matrices(const Params *p, double A[4][4], double B[4])
 {
     // Matriz A
-    A[0][0] = p->X_u;      A[0][1] = p->X_w;      A[0][2] = 0.0;       A[0][3] = p->X_theta;
+    A[0][0] = p->X_u;      A[0][1] = p->X_w;      A[0][2] = -p->w0_ms; A[0][3] = p->X_theta;
     A[1][0] = p->Z_u_hat;  A[1][1] = p->Z_w_hat;  A[1][2] = p->u0_ms;  A[1][3] = p->Z_theta;
     A[2][0] = p->M_u_hat;  A[2][1] = p->M_w_hat;  A[2][2] = p->M_q_hat;A[2][3] = 0.0;
     A[3][0] = 0.0;         A[3][1] = 0.0;         A[3][2] = 1.0;       A[3][3] = 0.0;
 
-    // Matriz B (4x1) – usando Z_de y M_de directamente (como en tu ejemplo)
-    B[0] = 0.0;
+    // Matriz B (4x1)
+    B[0] = p->X_de;
     B[1] = p->Z_de;
     B[2] = p->M_de;
     B[3] = 0.0;
@@ -32,10 +37,11 @@ void build_state_space_matrices(const Params *p, double A[4][4], double B[4])
 
 /*
  * Supuestos del modelo lateral-direccional:
- *  - Ejes de estabilidad (w0 = 0 en la ecuacion lateral). El longitudinal
- *    esta en ejes cuerpo (w0_ms != 0); el termino +w0*dp de la ecuacion de
- *    fuerza lateral en ejes cuerpo se desprecia en esta fase.
- *  - u0 = u0_ms ; theta0 = theta0_deg (cabeceo de trim).
+ *  - Ejes cuerpo, igual que el longitudinal: u0 = u0_ms, w0 = w0_ms,
+ *    theta0 = theta0_deg (cabeceo de trim). Fuerza lateral:
+ *      dv/dt = Y_v dv + (Y_p + w0) dp + (Y_r - u0) dr + g cos(theta0) dphi
+ *    y cinematica linealizada dphi/dt = dp + tan(theta0) dr.
+ *    Con w0 = 0 y theta0 = 0 queda la forma de Nelson (ejes de estabilidad).
  *  - Canales longitudinal y lateral desacoplados (modelo lineal).
  *  - Sin dpsi: 4 estados.
  *
@@ -72,13 +78,14 @@ void build_lateral_matrices(const Params *p, double A[4][4], double B[4][2])
     }
 
     const double u0     = (double)p->u0_ms;
+    const double w0     = (double)p->w0_ms;
     const double theta0 = (double)p->theta0_deg * M_PI / 180.0;
 
     // Matriz A
-    A[0][0] = p->Y_v;  A[0][1] = p->Y_p;  A[0][2] = -(u0 - p->Y_r); A[0][3] = DYN_GRAVITY_MPS2 * cos(theta0);
-    A[1][0] = Lc[0];   A[1][1] = Lc[1];   A[1][2] = Lc[2];          A[1][3] = 0.0;
-    A[2][0] = Nc[0];   A[2][1] = Nc[1];   A[2][2] = Nc[2];          A[2][3] = 0.0;
-    A[3][0] = 0.0;     A[3][1] = 1.0;     A[3][2] = 0.0;            A[3][3] = 0.0;
+    A[0][0] = p->Y_v;  A[0][1] = p->Y_p + w0; A[0][2] = -(u0 - p->Y_r); A[0][3] = DYN_GRAVITY_MPS2 * cos(theta0);
+    A[1][0] = Lc[0];   A[1][1] = Lc[1];       A[1][2] = Lc[2];          A[1][3] = 0.0;
+    A[2][0] = Nc[0];   A[2][1] = Nc[1];       A[2][2] = Nc[2];          A[2][3] = 0.0;
+    A[3][0] = 0.0;     A[3][1] = 1.0;         A[3][2] = tan(theta0);    A[3][3] = 0.0;
 
     // Matriz B (4x2): columnas [da, dr]
     B[0][0] = 0.0;     B[0][1] = p->Y_dr;
