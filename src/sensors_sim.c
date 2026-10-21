@@ -103,11 +103,11 @@ static double sensors_get_w_body_ms(const FlightSim *sim)
 
     /*
      * Tu estado X[1] = dw.
-     * En modelo longitudinal inicial usamos:
+     * En ejes cuerpo, igual que la veleta:
      *
-     * w = dw
+     * w = w0_ms + dw
      */
-    return sim->X_lon[1];
+    return (double)sim->params.w0_ms + sim->X_lon[1];
 }
 
 static double sensors_get_q_radps(const FlightSim *sim)
