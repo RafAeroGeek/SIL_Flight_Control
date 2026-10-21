@@ -5,15 +5,16 @@ y lateral-direccional de aeronave en espacio de estados (lineal, desacoplada),
 integrada con RK4, con simulación de servos, sensores y un scheduler
 cooperativo que imita los periodos de tarea de un RTOS.
 
-Vectores de estado:
+Vectores de estado (ejes cuerpo):
 - Longitudinal: `X_lon = [du, dw, dq, dtheta]`, entrada `delta_e`.
 - Lateral-direccional: `X_lat = [dv, dp, dr, dphi]`, entradas `[delta_a, delta_r]`.
 
 Aeronave activa: `aircraft/ugly_stick.json` (ver `AIRCRAFT_JSON_PATH`).
 
-Las derivadas **laterales** de `ugly_stick.json` salen de
-`dynamics/latdir_analysis.py` (estimación con Nelson cap. 5 a H = 1000 m,
-V0 = 25.25 m/s, m = 20 kg; ver [Derivadas lateral-direccionales](#derivadas-lateral-direccionales-dynamics)).
+Las derivadas **longitudinales y laterales** de `ugly_stick.json` salen de
+`dynamics/` (estimación con Nelson a H = 1000 m, V0 = 25.25 m/s, m = 20 kg,
+vuelo nivelado, pasadas a ejes cuerpo; ver
+[Derivadas de estabilidad](#derivadas-de-estabilidad-dynamics)).
 
 > ⚠️ Las de `aircraft_a.json` siguen siendo **placeholders del Navion**
 > (`"lateral_source": "PLACEHOLDER_NAVION_Nelson"`).
@@ -67,16 +68,31 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release
 ```
 
+## Modelo longitudinal
+
+Nelson cap. 3–4, en **ejes cuerpo** (`u0 = u0_ms`, `w0 = w0_ms`; con
+`w0 = 0` y `X_de = 0` queda la forma de Nelson en ejes de estabilidad):
+
+```
+      | X_u    X_w    -w0     X_θ |          | X_de |
+  A = | Ẑ_u    Ẑ_w     u0     Z_θ |      B = | Z_de |
+      | M̂_u    M̂_w    M̂_q     0   |          | M_de |
+      | 0      0      1       0   |          | 0    |
+```
+
+`X_θ = −g·cos θ0`, `Z_θ = −g·sin θ0`; `X_de` (m/s², opcional, default 0) es la
+componente en X del elevador al girar a ejes cuerpo.
+
 ## Modelo lateral-direccional
 
 Nelson, *Flight Stability and Automatic Control*, cap. 5. Pequeñas perturbaciones
-alrededor de vuelo recto y nivelado, en **ejes de estabilidad**:
+alrededor de vuelo recto y nivelado, en **ejes cuerpo**:
 
 ```
-      | Y_v   Y_p   -(u0 - Y_r)   g·cos(θ0) |          |  0     Y_dr |
-  A = | L_v   L_p    L_r           0        |      B = | L_da   L_dr |
-      | N_v   N_p    N_r           0        |          | N_da   N_dr |
-      | 0     1      0             0        |          |  0     0    |
+      | Y_v   Y_p + w0   -(u0 - Y_r)   g·cos(θ0) |          |  0     Y_dr |
+  A = | L_v   L_p         L_r           0        |      B = | L_da   L_dr |
+      | N_v   N_p         N_r           0        |          | N_da   N_dr |
+      | 0     1           tan(θ0)       0        |          |  0     0    |
 ```
 
 `build_lateral_matrices` (`src/dynamics.c`) aplica además la corrección por
@@ -84,14 +100,15 @@ producto de inercia: con `D = 1 - I_xz²/(I_x·I_z)`, las filas L y N usan
 `L*x + (I_xz/I_x)·N*x` y `N*x + (I_xz/I_z)·L*x` (`L*x = L_x/D`, `N*x = N_x/D`).
 
 Supuestos: canales desacoplados (integrar el lateral no cambia el
-longitudinal); se desprecia el término `+w0·dp` de ejes cuerpo; no hay `dpsi`,
-así que la velocidad Este del GPS sigue en 0.
+longitudinal); no hay `dpsi`, así que la velocidad Este del GPS sigue en 0.
+Los sensores usan los mismos ejes: `w = w0 + dw` y `θ = θ0 + dθ`.
 
 ### Claves JSON nuevas (`aircraft/*.json`)
 
 | Clave | Unidad | Nota |
 |---|---|---|
 | `theta0_deg` | deg | cabeceo de trim (γ0 + atan2(w0, u0)) |
+| `X_de` | m/s² | longitudinal, opcional (default 0) |
 | `I_x`, `I_z`, `I_xz` | kg·m² | inercias (default `I_x = I_z = 1`) |
 | `Y_v` | 1/s | fuerza lateral |
 | `Y_p`, `Y_r` | m/s | fuerza lateral |
@@ -140,31 +157,53 @@ python3 test/compare_csv_cols.py data/baseline_<commit_base>.csv data/SIL_sim_se
 
 La línea base puede generarse con `ROUTINE_LONGITUDINAL` y la comparación
 correrse con `ROUTINE_LAT_DIR`: ambas rutinas tienen el mismo `pitch`, así que el
-estado longitudinal debe coincidir. La línea base `4affdca` de v0.2-lateral ya
-no aplica: el `pitch` de ambas rutinas cambió a un doblete de 1–3 s y la τ de
-los servos de elevador y alerón a 0.05 s, así que hay que regenerarla.
+estado longitudinal debe coincidir. La línea base vigente es `5ea17b6` (modelo
+en ejes cuerpo con `ugly_stick.json` generado desde `dynamics/`); las anteriores
+(`4affdca`, `f1b6478`) ya no aplican.
 
-## Derivadas lateral-direccionales (`dynamics/`)
+## Derivadas de estabilidad (`dynamics/`)
 
-`dynamics/latdir_analysis.py` estima los coeficientes laterales (Nelson cap. 5;
-posición del ala con DATCOM 5.2.1.1; inercias con radios de giro de Roskam) a
-partir de la geometría en `dynamics/ugly_data.json`, y escribe
-`dynamics/ugly_latdir_resultados.json`. `dynamics/latdir_a_aircraft.py` pasa
-esos resultados al JSON de la aeronave (estado β → dv: `Y_v = Yβ/u0`,
-`L_v = Lβ/u0`, `N_v = Nβ/u0`) y se niega si V0 o la masa no coinciden.
+Una sola entrada, `dynamics/ugly_data.json` (condición de vuelo, geometría,
+aerodinámica e inercias), alimenta los dos análisis, ambos en **ejes de
+estabilidad** y con atmósfera ISA (`dynamics/atmosfera.py`):
+
+- `lon_analysis.py` (Nelson cap. 3–4): trim (α, δe), derivadas con las "hat"
+  por `M_ẇ`, A/B `[du, dw, dq, dθ]` y modos → `ugly_lon_resultados.json`.
+  `--plots` muestra respuesta del periodo corto, envolvente y lugar de raíces
+  (requiere matplotlib y python-control).
+- `latdir_analysis.py` (Nelson cap. 5; posición del ala con DATCOM 5.2.1.1)
+  → `ugly_latdir_resultados.json`.
+
+Inercias con radios de giro de Roskam: `I_x`, `I_z` (latdir) e
+`I_y = m·(R̄y·l_f)²/4` con R̄y = 0.38 (lon), todas de ejes cuerpo.
+
+`dynamics/a_aircraft.py` lleva ambos resultados al JSON de la aeronave
+**girándolos a ejes cuerpo** con α = atan2(w0, u0): semejanza `P·A·P⁻¹` en el
+longitudinal y giro de momentos y de (p, r) en el lateral (con β → dv:
+`Y_v = Yβ/V0`, etc.). Se niega si V0, masa, ρ o altitud no coinciden.
 
 ```bash
+python3 dynamics/lon_analysis.py dynamics/ugly_data.json
 python3 dynamics/latdir_analysis.py dynamics/ugly_data.json
-python3 dynamics/latdir_a_aircraft.py dynamics/ugly_latdir_resultados.json \
-    aircraft/ugly_stick.json            # --dry-run para solo ver los cambios
+python3 dynamics/a_aircraft.py dynamics/ugly_lon_resultados.json \
+    dynamics/ugly_latdir_resultados.json aircraft/ugly_stick.json   # --dry-run
 pytest dynamics
 ```
 
-Modos del Ugly Stick (eigenvalores exactos de A): roll λ = −13.3 (τ = 0.075 s),
-dutch roll −0.376 ± 4.08j (ωn = 4.09 rad/s, ζ = 0.092) y espiral **inestable**
-λ = +0.075 (duplica en 9.2 s), dominada por un `Cnr` débil frente a `Clr`. Las
-aproximaciones de orden reducido que imprime el script no sirven para la
-espiral (`Lβ ≈ 0`). Son estimaciones teóricas: inercias y factores empíricos
+Modos del Ugly Stick (eigenvalores exactos; iguales en ambos ejes):
+
+| Modo | λ | ωn [rad/s] | ζ |
+|---|---|---|---|
+| Periodo corto | −4.21 ± 3.09j | 5.22 | 0.81 |
+| Fugoide | −0.017 ± 0.413j | 0.41 | 0.041 |
+| Roll | −13.3 | — | — |
+| Dutch roll | −0.413 ± 4.10j | 4.12 | 0.10 |
+| Espiral | **+0.075** (duplica en 9.3 s) | — | — |
+
+Trim: α = θ0 = 5.92°, δe = −0.49° (no se escribe en la aeronave: el C toma el
+elevador absoluto como perturbación). La espiral inestable viene de un `Cnr`
+débil frente a `Clr`; las aproximaciones de orden reducido de latdir no sirven
+para ella (`Lβ ≈ 0`). Son estimaciones teóricas: inercias y factores empíricos
 son la mayor incertidumbre.
 
 ## Graficar los resultados
