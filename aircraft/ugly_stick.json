@@ -7,9 +7,11 @@
     "gamma0_deg": 3.0,
     "masa_kg": 20,
 
+    "longitudinal_source": "manual",
     "X_u": -0.05307,
     "X_w": 0.1780,
     "X_theta": -9.7,
+    "X_de": 0.0,
 
     "Z_u_hat": -0.7734,
     "Z_w_hat": -2.3706,
