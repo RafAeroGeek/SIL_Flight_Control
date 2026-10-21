@@ -96,6 +96,9 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
     d_e_trim   = -(CM_0 * CL_alpha + CM_alpha * CL_trim) / (CM_de * CL_alpha - CM_alpha * CL_de)
     alpha_trim = (CL_trim - CL_de * d_e_trim) / CL_alpha + alpha_0 / 57.3
 
+    # Cabeceo (Roskam, como I_x/I_z en latdir): I_y = m (R̄_y·l_f / 2)^2
+    Iy = m * (datos["radio_giro_y_adim"] * datos["l_f[m]"])**2 / 4
+
     u0     = V0 * math.cos(alpha_trim)
     w0     = V0 * math.sin(alpha_trim)
     theta0 = alpha_trim + gamma0 / 57.3
@@ -119,7 +122,7 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
         "alpha_trim_deg"  : alpha_trim * 57.3,
         "gamma0_deg"      : gamma0,
         "theta0_deg"      : theta0 * 57.3,
-        "Iy_kg_m2"        : datos["Iy"],
+        "Iy_kg_m2"        : Iy,
         "_gamma0_rad"     : gamma0 / 57.3,
     }
 
@@ -164,7 +167,7 @@ def calcular_derivadas_dimensionales(datos: dict, aux: dict, coef: dict) -> dict
     m    = datos["masa[Kg]"]
     S    = datos["S[m2]"]
     cam  = datos["cam[m]"]
-    Iy   = datos["Iy"]
+    Iy   = aux["Iy_kg_m2"]
     CL_u = datos["CL_u"]
     CD_u = datos["CD_u"]
     CM_u = datos["CM_u"]

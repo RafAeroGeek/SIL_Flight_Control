@@ -26,6 +26,6 @@
   "CL_alpha_ht": 2.95,
   "CL_alpha_w": 3.67,
   "Ix" : 1.2,
-  "Iy" : 3.5,
+  "radio_giro_y_adim" : 0.38,
   "Iz" : 6.8
   }
