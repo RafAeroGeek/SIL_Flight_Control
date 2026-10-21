@@ -24,6 +24,8 @@ import sys
 import os
 from datetime import datetime
 
+from atmosfera import densidad_isa
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. LECTURA DE DATOS
@@ -52,8 +54,8 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
     ini = datos["inercia"]
 
     m   = v["m_kg"]
-    H   = v["H_km"]
-    M   = v["M_mach"]
+    H   = v["H_m"]
+    V0  = v["V0_m_s"]
     g   = v["g_mps2"]
     b   = a["b_m"]
     S   = a["S_m2"]
@@ -64,11 +66,8 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
     l_v = cv["l_v_m"]
     l_f = ini["l_f_m"]
 
-    # Densidad (ISA polinomial, H en km)
-    rho = 1.225 * (20 - H) / (20 + H)
-
-    # Velocidad verdadera (TAS)
-    V0 = 340.3 * M * (1 - 0.011825 * H)
+    # Densidad ISA (V0 es TAS)
+    rho = densidad_isa(H)
 
     # Presión dinámica
     Q_inf = 0.5 * rho * V0**2
