@@ -87,10 +87,6 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 | — | Throttle: tau/rate del ESC "PROPUESTOS - REVISAR"; el throttle no realimenta la planta |
 | — | `lon_analysis.py --plots` sin probar (requiere `python-control`) |
 
-### Documentación desactualizada
-- `TODO.md` 1.3 → el estado lista los modos de 2026-10-20 (ejes de
-  estabilidad, ISA polinomial); los vigentes son los de la tabla de arriba.
-
 ---
 
 ## 3. Plan propuesto
@@ -99,8 +95,7 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 1. Borrar `feat/derivadas-longitudinales-ugly` (local + remoto).
 2. Revisar `stash@{3}` (`data.zip`) y descartar los stashes.
 3. Borrar `build_tests/`.
-4. Actualizar el estado de TODO 1.3.
-5. Tag `v0.3-dynamics` (o similar) sobre `main` para marcar el modelo en ejes
+4. Tag `v0.3-dynamics` (o similar) sobre `main` para marcar el modelo en ejes
    cuerpo con derivadas del Ugly Stick; subir `CMakeLists.txt` de versión.
 
 ### Paso 1 — Planta coherente con el trim (8.13 + amplitud del doblete)
