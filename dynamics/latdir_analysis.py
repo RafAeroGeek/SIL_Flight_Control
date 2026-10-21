@@ -190,7 +190,9 @@ def calcular_coeficientes(datos: dict, aux: dict) -> dict:
 
     Cnp = -CL_trim / 8
 
-    Clp = -(CLa_w - CD0_w) * (c_r * b * (1 + 3 * lam)) / (24 * S)
+    # Nelson: Clp = -(CLα_w/12)(1 + 3λ)/(1 + λ), sin término de CD0
+    # (c_r b (1+3λ) / (24 S) es esa misma razón para ala trapezoidal)
+    Clp = -CLa_w * (c_r * b * (1 + 3 * lam)) / (24 * S)
 
     # ── Derivadas en r ───────────────────────────────────────────────────────
     # Nelson: CYr = -2 CYβ_v (l_v/b)  (positiva)
