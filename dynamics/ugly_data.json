@@ -3,9 +3,9 @@
   "descripcion": "ugly — Datos para análisis lateral-direccional",
 
   "vuelo": {
-    "m_kg"  : 25.0,
-    "H_km"  : 1.334,
-    "M_mach": 0.074,
+    "m_kg"  : 20.0,
+    "H_km"  : 1.0,
+    "M_mach": 0.0750871,
     "g_mps2": 9.81
   },
 
