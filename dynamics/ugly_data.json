@@ -1,0 +1,49 @@
+{
+  "aeronave": "ugly",
+  "descripcion": "ugly — Datos para análisis lateral-direccional",
+
+  "vuelo": {
+    "m_kg"  : 25.0,
+    "H_km"  : 1.334,
+    "M_mach": 0.074,
+    "g_mps2": 9.81
+  },
+
+  "ala": {
+    "c_r_m"  : 0.41,
+    "c_t_m"  : 0.41,
+    "b_m"    : 2.43,
+    "S_m2"   : 0.9963,
+    "c_bar_m": 0.41,
+    "S_a_m2" : 0.145,
+    "b1_m"   : 0.66,
+    "b2_m"   : 1.2,
+    "Gamma_deg"    : 0.0,
+    "Lambda_deg"   : 0.0,
+    "Lambda14_deg" : 0.0
+  },
+
+  "cola_vertical": {
+    "S_v_m2": 0.079,
+    "S_r_m2": 0.044,
+    "l_v_m" : 0.93,
+    "z_v_m" : 0.02,
+    "eta_v" : 0.9,
+    "K_v"   : -0.15,
+    "dsigma_dbeta": 0.0
+  },
+
+  "aerodinamica": {
+    "CLa_w"  : 3.6,
+    "CD0_w"  : 0.015,
+    "CLa_v"  : 2.79
+  },
+
+  "inercia": {
+    "Ix_estimado": true,
+    "radio_giro_x_adim": 0.25,
+    "Iz_estimado": true,
+    "radio_giro_z_adim": 0.43,
+    "l_f_m": 2.22
+  }
+}
