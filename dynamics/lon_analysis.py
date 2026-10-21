@@ -184,7 +184,8 @@ def calcular_derivadas_dimensionales(datos: dict, aux: dict, coef: dict) -> dict
     M_w     = Q * S * cam * CM_alpha / (Iy * u0)
     M_q     = Q * S * cam**2 * coef["CM_q"] / (Iy * V0 * 2)
     M_alpha = Q * S * cam * CM_alpha / Iy
-    M_w_dot = Q * S * cam**2 * coef["CM_adot"] / (Iy * u0**2)
+    # Nelson: M_ẇ = Cmα̇ (c̄/2u0) Q S c̄ / (u0 Iy), mismo /2 que Z_ẇ y M_q
+    M_w_dot = Q * S * cam**2 * coef["CM_adot"] / (2 * Iy * u0**2)
     M_alpha_dot = u0 * M_w_dot
 
     M_de = Q * S * cam * aux["CM_de"] / Iy
