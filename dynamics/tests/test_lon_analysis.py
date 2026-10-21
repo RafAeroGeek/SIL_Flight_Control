@@ -33,7 +33,7 @@ def test_resultados_commiteados_al_dia(res):
 def test_A_con_la_forma_del_C(res):
     """Disposición de build_state_space_matrices() (src/dynamics.c) + M̂_θ."""
     d  = res["derivadas_dimensionales"]
-    u0 = res["condicion_vuelo"]["u0_m_s"]
+    u0 = res["condicion_vuelo"]["V0_m_s"]      # ejes de estabilidad
     A  = np.array(res["espacio_de_estados"]["A"])
     esperada = np.array([
         [d["X_u"],     d["X_w"],     0.0,          d["X_theta"]],

@@ -16,6 +16,8 @@ la respuesta al escalón y el lugar de las raíces (requiere matplotlib y
 python-control).
 
 Estados: x = [du, dw, dq, dθ]    Entrada: δe
+Ejes de estabilidad (u0 = V0, w0 = 0, θ0 = γ0). El paso a ejes cuerpo, que
+es como integra el simulador C, lo hace el convertidor con α_trim.
 Referencia teórica: Nelson, Flight Stability and Automatic Control, cap. 3–4.
 """
 
@@ -50,7 +52,8 @@ def cargar_datos(ruta_json: str) -> dict:
 def calcular_condicion_vuelo(datos: dict) -> dict:
     """
     Densidad, presión dinámica, C_L/C_D de trim, Cmα, efectividad del
-    elevador, trim (δe, α) y velocidades u0/w0 en ejes cuerpo.
+    elevador y trim (δe, α). u0/w0/θ0 de ejes cuerpo van solo como dato
+    para el convertidor; el análisis es en ejes de estabilidad.
     """
     Alt      = datos["Alt[m]"]
     V0       = datos["V_0[m/s]"]
@@ -115,8 +118,7 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
         "gamma0_deg"      : gamma0,
         "theta0_deg"      : theta0 * 57.3,
         "Iy_kg_m2"        : datos["Iy"],
-        "_alpha_trim_rad" : alpha_trim,
-        "_theta0_rad"     : theta0,
+        "_gamma0_rad"     : gamma0 / 57.3,
     }
 
 
@@ -166,8 +168,7 @@ def calcular_derivadas_dimensionales(datos: dict, aux: dict, coef: dict) -> dict
     CM_u = datos["CM_u"]
     CL_alpha = datos["CL_alpha"]
 
-    V0 = aux["V0_m_s"]
-    u0 = aux["u0_m_s"]
+    u0 = aux["V0_m_s"]          # ejes de estabilidad
     Q  = aux["Q_Pa"]
     CL_trim  = aux["CL_trim"]
     CD_trim  = aux["CD_trim"]
@@ -182,7 +183,7 @@ def calcular_derivadas_dimensionales(datos: dict, aux: dict, coef: dict) -> dict
     Z_w_dot = Q * S * cam * coef["CZ_adot"] / (2 * m * u0**2)
     Z_alpha = Z_w * u0
     M_w     = Q * S * cam * CM_alpha / (Iy * u0)
-    M_q     = Q * S * cam**2 * coef["CM_q"] / (Iy * V0 * 2)
+    M_q     = Q * S * cam**2 * coef["CM_q"] / (Iy * u0 * 2)
     M_alpha = Q * S * cam * CM_alpha / Iy
     # Nelson: M_ẇ = Cmα̇ (c̄/2u0) Q S c̄ / (u0 Iy), mismo /2 que Z_ẇ y M_q
     M_w_dot = Q * S * cam**2 * coef["CM_adot"] / (2 * Iy * u0**2)
@@ -191,9 +192,10 @@ def calcular_derivadas_dimensionales(datos: dict, aux: dict, coef: dict) -> dict
     M_de = Q * S * cam * aux["CM_de"] / Iy
     Z_de = -aux["CL_de"] * Q * S / m
 
-    th0 = aux["_theta0_rad"]
-    X_theta = -G_MPS2 * math.cos(th0)
-    Z_theta = -G_MPS2 * math.sin(th0)
+    # Ejes de estabilidad: θ0 = γ0
+    g0 = aux["_gamma0_rad"]
+    X_theta = -G_MPS2 * math.cos(g0)
+    Z_theta = -G_MPS2 * math.sin(g0)
 
     # ── "Hats": se sustituye ẇ de la ecuación de Z en la de M ───────────────
     # Forma de Nelson: Z_ẇ (|Z_ẇ| < 1 %) y Z_q se desprecian, así la fila de
@@ -231,7 +233,7 @@ def calcular_matrices_estado(aux: dict, dim: dict) -> dict:
       dq̇ = M̂_u·du + M̂_w·dw + M̂_q·dq + M̂_θ·dθ       + M̂_δe·δe
       dθ̇ =                     dq
     """
-    u0 = aux["u0_m_s"]
+    u0 = aux["V0_m_s"]          # ejes de estabilidad
     A = [
         [dim["X_u"],     dim["X_w"],     0.0,            dim["X_theta"]    ],
         [dim["Z_u_hat"], dim["Z_w_hat"], u0,             dim["Z_theta"]    ],
@@ -269,7 +271,6 @@ def calcular_modos(aux: dict, dim: dict, ss: dict) -> dict:
     Aproximaciones de periodo corto y fugoide (Nelson) y modos exactos
     a partir de los eigenvalores de A.
     """
-    u0 = aux["u0_m_s"]
     V0 = aux["V0_m_s"]
 
     omega_sp = (dim["M_q"] * dim["Z_w"] - dim["M_alpha"])**0.5
@@ -285,7 +286,7 @@ def calcular_modos(aux: dict, dim: dict, ss: dict) -> dict:
             "zeta"          : zeta_sp,
             "T_s"           : 2 * math.pi / omega_sp,
             "n_alpha_g_rad" : n_a,
-            "T_theta2_s"    : -u0 / dim["Z_alpha"],
+            "T_theta2_s"    : -V0 / dim["Z_alpha"],
             "CAP"           : omega_sp**2 / n_a,
         },
         "fugoide": {
