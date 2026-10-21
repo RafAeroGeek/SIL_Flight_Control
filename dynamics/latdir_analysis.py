@@ -211,11 +211,12 @@ def calcular_coeficientes(datos: dict, aux: dict) -> dict:
     Cnda = 2 * K_v * CL_trim * Clda
 
     # ── Derivadas de control — timón de dirección ────────────────────────────
-    CYdr = (S_v / S) * tau * CLa_v
+    # Fuerza del timón aplicada en la cola: Cnδr = -CYδr l_v/b y Clδr = CYδr z_v/b
+    CYdr = eta_v * (S_v / S) * tau * CLa_v
 
     Cndr = -V_v * eta_v * tau * CLa_v
 
-    Cldr = (z_v / b) * tau * CLa_v
+    Cldr = CYdr * (z_v / b)
 
     return {
         # estabilidad en β
