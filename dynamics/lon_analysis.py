@@ -30,6 +30,8 @@ from datetime import datetime
 
 import numpy as np
 
+from atmosfera import densidad_isa
+
 G_MPS2 = 9.81
 
 
@@ -74,7 +76,7 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
     CM_0     = datos["CM_0"]
     CL_a_ht  = datos["CL_alpha_ht"]
 
-    rho = 1.225 * math.exp(-Alt / 8400)
+    rho = densidad_isa(Alt)
     W   = m * G_MPS2
     Q   = 0.5 * rho * V0**2
 
