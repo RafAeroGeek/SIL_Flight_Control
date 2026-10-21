@@ -1,6 +1,6 @@
 {
   "aeronave": "ugly",
-  "descripcion": "ugly — Datos para análisis lateral-direccional",
+  "descripcion": "ugly — Datos para análisis longitudinal y lateral-direccional",
   "condicion_vuelo": {
     "rho_kg_m3": 1.1116424838589072,
     "V0_m_s": 25.25,

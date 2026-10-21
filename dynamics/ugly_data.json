@@ -1,12 +1,13 @@
 {
   "aeronave": "ugly",
-  "descripcion": "ugly — Datos para análisis lateral-direccional",
+  "descripcion": "ugly — Datos para análisis longitudinal y lateral-direccional",
 
   "vuelo": {
-    "m_kg"  : 20.0,
-    "H_m"   : 1000.0,
-    "V0_m_s": 25.25,
-    "g_mps2": 9.81
+    "m_kg"      : 20.0,
+    "H_m"       : 1000.0,
+    "V0_m_s"    : 25.25,
+    "gamma0_deg": 0.0,
+    "g_mps2"    : 9.81
   },
 
   "ala": {
@@ -22,7 +23,20 @@
     "Lambda_deg"   : 0.0,
     "Lambda14_deg" : 0.0,
     "z_w_m"  : -0.1,
-    "D_f_m"  : 0.25
+    "D_f_m"  : 0.25,
+    "alpha_0_deg": -1.37
+  },
+
+  "centrado": {
+    "x_cg_m": 0.145,
+    "x_np_m": 0.180
+  },
+
+  "cola_horizontal": {
+    "S_ht_m2": 0.2712,
+    "S_e_m2" : 0.093,
+    "l_ht_m" : 1.1,
+    "eta_ht" : 1.0
   },
 
   "cola_vertical": {
@@ -36,14 +50,22 @@
   },
 
   "aerodinamica": {
+    "CLa"    : 4.4,
     "CLa_w"  : 3.6,
-    "CD0_w"  : 0.015,
-    "CLa_v"  : 2.79
+    "CLa_ht" : 2.95,
+    "CLa_v"  : 2.79,
+    "CD0"    : 0.017,
+    "k"      : 0.0616,
+    "CL_u"   : 0.0028,
+    "CD_u"   : 0.00022,
+    "CM_u"   : 0.00033,
+    "CM_0"   : 0.037
   },
 
   "inercia": {
     "Ix_estimado": true,
     "radio_giro_x_adim": 0.25,
+    "radio_giro_y_adim": 0.38,
     "Iz_estimado": true,
     "radio_giro_z_adim": 0.43,
     "l_f_m": 2.22

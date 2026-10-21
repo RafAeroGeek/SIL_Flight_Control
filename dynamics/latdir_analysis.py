@@ -157,7 +157,7 @@ def calcular_coeficientes(datos: dict, aux: dict) -> dict:
     K_v     = cv["K_v"]
     ds_db   = cv["dsigma_dbeta"]
     CLa_w   = ae["CLa_w"]
-    CD0_w   = ae["CD0_w"]
+    CD0_w   = ae["CD0"]
     CLa_v   = ae["CLa_v"]
 
     CL_trim = aux["CL_trim"]

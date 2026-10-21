@@ -6,7 +6,7 @@ Análisis longitudinal de una aeronave a partir de un archivo JSON de
 parámetros de entrada.
 
 Uso (desde la raíz del repo):
-    python3 dynamics/lon_analysis.py dynamics/ugly_longitudinal.json [--plots]
+    python3 dynamics/lon_analysis.py dynamics/ugly_data.json [--plots]
 
 Genera, junto al archivo de entrada:
     <aeronave>_lon_resultados.json
@@ -57,24 +57,30 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
     elevador y trim (δe, α). u0/w0/θ0 de ejes cuerpo van solo como dato
     para el convertidor; el análisis es en ejes de estabilidad.
     """
-    Alt      = datos["Alt[m]"]
-    V0       = datos["V_0[m/s]"]
-    gamma0   = datos["gamma_0[deg]"]
-    m        = datos["masa[Kg]"]
-    x_cg     = datos["x_cg[m]"]
-    x_ca     = datos["x_ca[m]"]           # punto neutro
-    b        = datos["b[m]"]
-    S        = datos["S[m2]"]
-    cam      = datos["cam[m]"]
-    l_ht     = datos["l_ht[m]"]
-    S_ht     = datos["S_ht[m2]"]
-    S_e      = datos["S_e[m2]"]
-    alpha_0  = datos["alpha_0[deg]"]      # ángulo de cero sustentación
-    CL_alpha = datos["CL_alpha"]          # avión completo
-    CD_0     = datos["CD_0"]
-    k        = datos["k"]
-    CM_0     = datos["CM_0"]
-    CL_a_ht  = datos["CL_alpha_ht"]
+    v   = datos["vuelo"]
+    a   = datos["ala"]
+    ht  = datos["cola_horizontal"]
+    ae  = datos["aerodinamica"]
+    ini = datos["inercia"]
+
+    Alt      = v["H_m"]
+    V0       = v["V0_m_s"]
+    gamma0   = v["gamma0_deg"]
+    m        = v["m_kg"]
+    x_cg     = datos["centrado"]["x_cg_m"]
+    x_ca     = datos["centrado"]["x_np_m"]    # punto neutro
+    b        = a["b_m"]
+    S        = a["S_m2"]
+    cam      = a["c_bar_m"]
+    alpha_0  = a["alpha_0_deg"]               # ángulo de cero sustentación
+    l_ht     = ht["l_ht_m"]
+    S_ht     = ht["S_ht_m2"]
+    S_e      = ht["S_e_m2"]
+    CL_alpha = ae["CLa"]                      # avión completo
+    CD_0     = ae["CD0"]
+    k        = ae["k"]
+    CM_0     = ae["CM_0"]
+    CL_a_ht  = ae["CLa_ht"]
 
     rho = densidad_isa(Alt)
     W   = m * G_MPS2
@@ -97,7 +103,7 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
     alpha_trim = (CL_trim - CL_de * d_e_trim) / CL_alpha + alpha_0 / 57.3
 
     # Cabeceo (Roskam, como I_x/I_z en latdir): I_y = m (R̄_y·l_f / 2)^2
-    Iy = m * (datos["radio_giro_y_adim"] * datos["l_f[m]"])**2 / 4
+    Iy = m * (ini["radio_giro_y_adim"] * ini["l_f_m"])**2 / 4
 
     u0     = V0 * math.cos(alpha_trim)
     w0     = V0 * math.sin(alpha_trim)
@@ -133,16 +139,16 @@ def calcular_condicion_vuelo(datos: dict) -> dict:
 
 def calcular_coeficientes(datos: dict, aux: dict) -> dict:
     """Cmq, Cmα̇, CZα̇ y dε/dα (Nelson cap. 3)."""
-    S       = datos["S[m2]"]
-    cam     = datos["cam[m]"]
-    l_ht    = datos["l_ht[m]"]
-    S_ht    = datos["S_ht[m2]"]
-    CL_a_ht = datos["CL_alpha_ht"]
-    CL_a_w  = datos["CL_alpha_w"]
+    S       = datos["ala"]["S_m2"]
+    cam     = datos["ala"]["c_bar_m"]
+    l_ht    = datos["cola_horizontal"]["l_ht_m"]
+    S_ht    = datos["cola_horizontal"]["S_ht_m2"]
+    eta_ht  = datos["cola_horizontal"]["eta_ht"]
+    CL_a_ht = datos["aerodinamica"]["CLa_ht"]
+    CL_a_w  = datos["aerodinamica"]["CLa_w"]
     AR      = aux["AR"]
     V_ht    = aux["V_ht"]
 
-    eta_ht = 1.0
     epsilon_alpha = 2 * CL_a_w / (math.pi * AR)
 
     CM_q    = -2 * eta_ht * (S_ht / S) * (l_ht / cam)**2 * CL_a_ht
@@ -164,14 +170,14 @@ def calcular_coeficientes(datos: dict, aux: dict) -> dict:
 
 def calcular_derivadas_dimensionales(datos: dict, aux: dict, coef: dict) -> dict:
     """Derivadas dimensionales (SI) y las "hat" corregidas por Z_ẇ."""
-    m    = datos["masa[Kg]"]
-    S    = datos["S[m2]"]
-    cam  = datos["cam[m]"]
+    m    = datos["vuelo"]["m_kg"]
+    S    = datos["ala"]["S_m2"]
+    cam  = datos["ala"]["c_bar_m"]
     Iy   = aux["Iy_kg_m2"]
-    CL_u = datos["CL_u"]
-    CD_u = datos["CD_u"]
-    CM_u = datos["CM_u"]
-    CL_alpha = datos["CL_alpha"]
+    CL_u = datos["aerodinamica"]["CL_u"]
+    CD_u = datos["aerodinamica"]["CD_u"]
+    CM_u = datos["aerodinamica"]["CM_u"]
+    CL_alpha = datos["aerodinamica"]["CLa"]
 
     u0 = aux["V0_m_s"]          # ejes de estabilidad
     Q  = aux["Q_Pa"]
@@ -325,7 +331,7 @@ def _sin_privadas(d: dict) -> dict:
 
 def ensamblar_resultados(datos, aux, coef, dim, modos, ss) -> dict:
     return {
-        "aeronave"   : datos.get("name", "aeronave"),
+        "aeronave"   : datos.get("aeronave", "aeronave"),
         "descripcion": "Análisis longitudinal (lon_analysis.py)",
         "condicion_vuelo"            : _sin_privadas(aux),
         "coeficientes_adimensionales": coef,

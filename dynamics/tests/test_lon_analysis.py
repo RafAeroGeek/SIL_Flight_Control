@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(RAIZ, "dynamics"))
 
 import lon_analysis as lon  # noqa: E402
 
-ENTRADA    = os.path.join(RAIZ, "dynamics", "ugly_longitudinal.json")
+ENTRADA    = os.path.join(RAIZ, "dynamics", "ugly_data.json")
 RESULTADOS = os.path.join(RAIZ, "dynamics", "ugly_lon_resultados.json")
 
 
