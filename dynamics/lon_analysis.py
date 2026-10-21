@@ -191,27 +191,29 @@ def calcular_derivadas_dimensionales(datos: dict, aux: dict, coef: dict) -> dict
     M_de = Q * S * cam * aux["CM_de"] / Iy
     Z_de = -aux["CL_de"] * Q * S / m
 
-    # ── "Hats" (corrección por Z_ẇ) ─────────────────────────────────────────
-    den = (1.0 - Z_w_dot) if abs(1.0 - Z_w_dot) > 1e-9 else 1e-9
-
     th0 = aux["_theta0_rad"]
+    X_theta = -G_MPS2 * math.cos(th0)
+    Z_theta = -G_MPS2 * math.sin(th0)
 
+    # ── "Hats": se sustituye ẇ de la ecuación de Z en la de M ───────────────
+    # Forma de Nelson: Z_ẇ (|Z_ẇ| < 1 %) y Z_q se desprecian, así la fila de
+    # Z queda tal cual y M̂_x = M_x + M_ẇ·Z_x, incluido el término en θ.
     return {
-        "X_u": X_u, "X_w": X_w,
-        "X_theta": -G_MPS2 * math.cos(th0),
+        "X_u": X_u, "X_w": X_w, "X_theta": X_theta,
         "Z_u": Z_u, "Z_w": Z_w, "Z_w_dot": Z_w_dot, "Z_alpha": Z_alpha,
-        "Z_theta": -G_MPS2 * math.sin(th0),
+        "Z_theta": Z_theta,
         "M_u": M_u, "M_w": M_w, "M_w_dot": M_w_dot, "M_q": M_q,
         "M_alpha": M_alpha, "M_alpha_dot": M_alpha_dot,
         "Z_de": Z_de, "M_de": M_de,
 
-        "Z_u_hat" : Z_u / den,
-        "Z_w_hat" : Z_w / den,
-        "M_u_hat" : (M_u + M_w_dot * Z_u) / den,
-        "M_w_hat" : (M_w + M_w_dot * Z_w) / den,
-        "M_q_hat" : (M_q + M_alpha_dot) / den,
-        "Z_de_hat": Z_de / den,
-        "M_de_hat": (M_de + M_w_dot * Z_de) / den,
+        "Z_u_hat"    : Z_u,
+        "Z_w_hat"    : Z_w,
+        "M_u_hat"    : M_u + M_w_dot * Z_u,
+        "M_w_hat"    : M_w + M_w_dot * Z_w,
+        "M_q_hat"    : M_q + M_alpha_dot,
+        "M_theta_hat": M_w_dot * Z_theta,
+        "Z_de_hat"   : Z_de,
+        "M_de_hat"   : M_de + M_w_dot * Z_de,
     }
 
 
@@ -221,20 +223,20 @@ def calcular_derivadas_dimensionales(datos: dict, aux: dict, coef: dict) -> dict
 
 def calcular_matrices_estado(aux: dict, dim: dict) -> dict:
     """
-    A (4×4) y B (4×1), misma forma que build_state_space_matrices()
-    (src/dynamics.c):
+    A (4×4) y B (4×1), forma de build_state_space_matrices() (src/dynamics.c)
+    más el término M̂_θ:
 
       du̇ = X_u·du + X_w·dw                 + X_θ·dθ
       dẇ = Ẑ_u·du + Ẑ_w·dw + u0·dq        + Z_θ·dθ + Ẑ_δe·δe
-      dq̇ = M̂_u·du + M̂_w·dw + M̂_q·dq                + M̂_δe·δe
+      dq̇ = M̂_u·du + M̂_w·dw + M̂_q·dq + M̂_θ·dθ       + M̂_δe·δe
       dθ̇ =                     dq
     """
     u0 = aux["u0_m_s"]
     A = [
-        [dim["X_u"],     dim["X_w"],     0.0,            dim["X_theta"]],
-        [dim["Z_u_hat"], dim["Z_w_hat"], u0,             dim["Z_theta"]],
-        [dim["M_u_hat"], dim["M_w_hat"], dim["M_q_hat"], 0.0           ],
-        [0.0,            0.0,            1.0,            0.0           ],
+        [dim["X_u"],     dim["X_w"],     0.0,            dim["X_theta"]    ],
+        [dim["Z_u_hat"], dim["Z_w_hat"], u0,             dim["Z_theta"]    ],
+        [dim["M_u_hat"], dim["M_w_hat"], dim["M_q_hat"], dim["M_theta_hat"]],
+        [0.0,            0.0,            1.0,            0.0               ],
     ]
     B = [
         [0.0            ],

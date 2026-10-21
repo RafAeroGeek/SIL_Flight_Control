@@ -31,14 +31,14 @@ def test_resultados_commiteados_al_dia(res):
 
 
 def test_A_con_la_forma_del_C(res):
-    """Misma disposición que build_state_space_matrices() (src/dynamics.c)."""
+    """Disposición de build_state_space_matrices() (src/dynamics.c) + M̂_θ."""
     d  = res["derivadas_dimensionales"]
     u0 = res["condicion_vuelo"]["u0_m_s"]
     A  = np.array(res["espacio_de_estados"]["A"])
     esperada = np.array([
         [d["X_u"],     d["X_w"],     0.0,          d["X_theta"]],
         [d["Z_u_hat"], d["Z_w_hat"], u0,           d["Z_theta"]],
-        [d["M_u_hat"], d["M_w_hat"], d["M_q_hat"], 0.0],
+        [d["M_u_hat"], d["M_w_hat"], d["M_q_hat"], d["M_theta_hat"]],
         [0.0,          0.0,          1.0,          0.0],
     ])
     np.testing.assert_array_equal(A, esperada)
