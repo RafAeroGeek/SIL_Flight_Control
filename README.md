@@ -11,8 +11,11 @@ Vectores de estado:
 
 Aeronave activa: `aircraft/ugly_stick.json` (ver `AIRCRAFT_JSON_PATH`).
 
-> ⚠️ Las derivadas **laterales** de `ugly_stick.json` y `aircraft_a.json` son
-> **placeholders del Navion** (Nelson), no las de esas aeronaves
+Las derivadas **laterales** de `ugly_stick.json` salen de
+`dynamics/latdir_analysis.py` (estimación con Nelson cap. 5 a H = 1000 m,
+V0 = 25.25 m/s, m = 20 kg; ver [Derivadas lateral-direccionales](#derivadas-lateral-direccionales-dynamics)).
+
+> ⚠️ Las de `aircraft_a.json` siguen siendo **placeholders del Navion**
 > (`"lateral_source": "PLACEHOLDER_NAVION_Nelson"`).
 
 ## Estructura
@@ -22,6 +25,7 @@ SIL_Flight_Control/
 ├── CMakeLists.txt      Configuración de compilación
 ├── src/                Código C (10 módulos)
 ├── python/             Scripts de análisis y graficación
+├── dynamics/           Estimación de derivadas lateral-direccionales (Python)
 ├── flightreview/       Visor interactivo de logs (servidor Bokeh + reporte HTML)
 └── data/               CSV y HTML generados (ignorados por git)
 ```
@@ -136,8 +140,32 @@ python3 test/compare_csv_cols.py data/baseline_<commit_base>.csv data/SIL_sim_se
 
 La línea base puede generarse con `ROUTINE_LONGITUDINAL` y la comparación
 correrse con `ROUTINE_LAT_DIR`: ambas rutinas tienen el mismo `pitch`, así que el
-estado longitudinal debe coincidir. Para la fase v0.2-lateral la línea base es
-`4affdca`.
+estado longitudinal debe coincidir. La línea base `4affdca` de v0.2-lateral ya
+no aplica: el `pitch` de ambas rutinas cambió a un doblete de 1–3 s y la τ de
+los servos de elevador y alerón a 0.05 s, así que hay que regenerarla.
+
+## Derivadas lateral-direccionales (`dynamics/`)
+
+`dynamics/latdir_analysis.py` estima los coeficientes laterales (Nelson cap. 5;
+posición del ala con DATCOM 5.2.1.1; inercias con radios de giro de Roskam) a
+partir de la geometría en `dynamics/ugly_data.json`, y escribe
+`dynamics/ugly_latdir_resultados.json`. `dynamics/latdir_a_aircraft.py` pasa
+esos resultados al JSON de la aeronave (estado β → dv: `Y_v = Yβ/u0`,
+`L_v = Lβ/u0`, `N_v = Nβ/u0`) y se niega si V0 o la masa no coinciden.
+
+```bash
+python3 dynamics/latdir_analysis.py dynamics/ugly_data.json
+python3 dynamics/latdir_a_aircraft.py dynamics/ugly_latdir_resultados.json \
+    aircraft/ugly_stick.json            # --dry-run para solo ver los cambios
+pytest dynamics
+```
+
+Modos del Ugly Stick (eigenvalores exactos de A): roll λ = −13.3 (τ = 0.075 s),
+dutch roll −0.376 ± 4.08j (ωn = 4.09 rad/s, ζ = 0.092) y espiral **inestable**
+λ = +0.075 (duplica en 9.2 s), dominada por un `Cnr` débil frente a `Clr`. Las
+aproximaciones de orden reducido que imprime el script no sirven para la
+espiral (`Lβ ≈ 0`). Son estimaciones teóricas: inercias y factores empíricos
+son la mayor incertidumbre.
 
 ## Graficar los resultados
 
@@ -175,7 +203,8 @@ En `src/sim_settings.h`:
 - `SIL_CONFIG_LATERAL` — `1` integra el canal lateral-direccional (por defecto),
   `0` solo longitudinal (las columnas laterales del CSV quedan en 0)
 - `SIM_PILOT_ROUTINE` — rutina del piloto simulado. Por defecto
-  `ROUTINE_LAT_DIR`: el mismo `pitch` que `ROUTINE_LONGITUDINAL` más un doblete
+  `ROUTINE_LAT_DIR`: el mismo `pitch` que `ROUTINE_LONGITUDINAL` (doblete de
+  ±0.25 de stick, 1–3 s) más un doblete
   de alerón (±1.8°, 1–3 s) y uno de timón (±2.7°, 5–7 s). `ROUTINE_LONGITUDINAL`
   satura el alerón a 20° y queda solo para la regresión longitudinal.
 

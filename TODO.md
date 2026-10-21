@@ -27,7 +27,10 @@
 - **Estimate:** 1.5h
 - **Related:** Helps validate system response before testing
 - **Status:** Navion verificado (numpy: −8.4330, −0.4861±2.3343j, −0.00893).
-  Pendiente para las derivadas reales (8.1).
+  Ugly Stick (2026-10-20, `dynamics/`): roll −13.33, dutch roll
+  −0.376±4.076j (ζ = 0.092, no cumple MIL ζ ≥ 0.19), espiral +0.0752
+  (inestable, T2 = 9.2 s). `dynamics/tests` verifica que la A del C da los
+  mismos eigenvalores.
 
 ---
 
@@ -119,8 +122,10 @@
 
 ### 8.1 Derivadas laterales reales (reemplazar placeholders Navion)
 - **Task:** Cargar en `aircraft/ugly_stick.json` las derivadas laterales reales
-  (desde MATLAB) y las de `aircraft/aircraft_a.json`. Hoy ambos traen
-  `"lateral_source": "PLACEHOLDER_NAVION_Nelson"`.
+  (desde MATLAB) y las de `aircraft/aircraft_a.json`.
+- **Hecho (ugly_stick, 2026-10-20):** estimadas con `dynamics/latdir_analysis.py`
+  (Nelson; ala alta DATCOM) y escritas con `dynamics/latdir_a_aircraft.py`.
+  `aircraft_a.json` sigue con placeholders del Navion.
 - **Note:** Los valores originales de `aircraft_a` eran `L_da = 4.66`, `L_p = -1.30`.
 - **Priority:** HIGH
 
@@ -172,6 +177,13 @@
 - **Task:** Corregir `L_v = -0.0298` -> `-0.299` (con el typo el espiral sale
   inestable: λ = +0.0385).
 - **Priority:** LOW
+
+### 8.12 Validar derivadas e inercias del Ugly Stick
+- **Task:** Las inercias salen de radios de giro de aviones reales y varios
+  factores son empíricos (`K_v`, `η_v`, el término `0.2·η·V_v·CLα_v` de Cnβ);
+  no se modela el fuselaje (Cnβ, Cnr). Medir I_x/I_z con péndulo bifilar y
+  ajustar Cnr/Clβ con datos de vuelo (respuesta a dobletes).
+- **Priority:** MEDIUM
 
 ---
 
