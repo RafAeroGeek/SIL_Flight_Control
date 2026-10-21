@@ -27,10 +27,12 @@
 - **Estimate:** 1.5h
 - **Related:** Helps validate system response before testing
 - **Status:** Navion verificado (numpy: −8.4330, −0.4861±2.3343j, −0.00893).
-  Ugly Stick (2026-10-20, `dynamics/`): roll −13.33, dutch roll
-  −0.376±4.076j (ζ = 0.092, no cumple MIL ζ ≥ 0.19), espiral +0.0752
-  (inestable, T2 = 9.2 s). `dynamics/tests` verifica que la A del C da los
-  mismos eigenvalores.
+  Ugly Stick (2026-10-21, `dynamics/`, ejes cuerpo, ISA 1000 m, 25.25 m/s,
+  20 kg): roll −13.31, dutch roll −0.413±4.096j (ζ = 0.10, no cumple MIL
+  ζ ≥ 0.19), espiral +0.0746 (inestable, T2 = 9.3 s). Longitudinal: periodo
+  corto −4.206±3.088j (ζ = 0.81), fugoide −0.0168±0.4125j (ζ = 0.041).
+  `dynamics/tests` verifica que las A del C dan los mismos eigenvalores que
+  el análisis en ejes de estabilidad.
 
 ---
 
@@ -58,7 +60,7 @@
   - Bug: TAS/IAS convention mixing
   - Bug: Noise model applied to velocity instead of pressure
 - **Files:** `src/sensors_sim.c`, `src/sensors_sim.h`
-- **Note:** cambia la línea base de regresión (agrupar con 8.6 y 8.7)
+- **Note:** cambia la línea base de regresión (agrupar con 8.7)
 - **Reference:** Standard atmosphere model (density decay)
 - **Acceptance:** 
   - Density decreases with altitude (verify at 1000m vs. 5000m)
