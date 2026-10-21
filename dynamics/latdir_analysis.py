@@ -172,13 +172,18 @@ def calcular_coeficientes(datos: dict, aux: dict) -> dict:
     Lam14   = aux["Lambda14_rad"]
 
     # ── Derivadas en β ───────────────────────────────────────────────────────
-    CYb = -eta_v * (S_v / S) * CLa_v * (1 + ds_db)
+    # Contribución de la cola vertical, referida al ala (Nelson cap. 5):
+    #   CYβ_v = -η (S_v/S) CLα_v (1 + dσ/dβ)
+    CYb_tail = -eta_v * (S_v / S) * CLa_v * (1 + ds_db)
+
+    CYb = CYb_tail   # sin contribución de fuselaje
 
     Cnb = (0.2 * eta_v * V_v * CLa_v
            + eta_v * V_v * CLa_v * (1 + ds_db))
 
+    # Nelson: ΔClβ_v = CYβ_v · z_v/b  (CYβ_v ya incluye η S_v/S)
     Clb = (-0.5 * CLa_w * Gamma * Z_lam * math.cos(Lam14)**2
-           + eta_v * CYb * (S_v * z_v) / (S * b))
+           + CYb_tail * z_v / b)
 
     # ── Derivadas en p ───────────────────────────────────────────────────────
     CYp = CL_trim * (AR + math.cos(Lam)) / (AR + 4 * math.cos(Lam)) * math.tan(Lam)
@@ -188,9 +193,8 @@ def calcular_coeficientes(datos: dict, aux: dict) -> dict:
     Clp = -(CLa_w - CD0_w) * (c_r * b * (1 + 3 * lam)) / (24 * S)
 
     # ── Derivadas en r ───────────────────────────────────────────────────────
-    CYb_tail = -CLa_v * (1 + ds_db)   # contribución local de la cola
-
-    CYr = 2 * eta_v * V_v * (l_v / b) * CYb_tail
+    # Nelson: CYr = -2 CYβ_v (l_v/b)  (positiva)
+    CYr = -2 * CYb_tail * (l_v / b)
 
     Cnr = -2 * eta_v * V_v * (l_v / b) * CLa_v
 
