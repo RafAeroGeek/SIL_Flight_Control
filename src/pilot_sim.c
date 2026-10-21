@@ -11,7 +11,7 @@ pilotcommand_s pilot_source_commands(uint32_t now_ms, unsigned id_routine)
     switch(id_routine){
         case ROUTINE_LONGITUDINAL:
             current_commands.roll       = 0.0 + step_cmd(now_ms, 40u, 1.0);// + step_cmd(now_ms, 300u, -1.0);
-            current_commands.pitch      = 0.0 + step_cmd(now_ms, 50u, 1.0) + step_cmd(now_ms, 150u, -2.0) + step_cmd(now_ms, 200u, 1.0);
+            current_commands.pitch      = 0.0 + step_cmd(now_ms, 1000u, 0.250) + step_cmd(now_ms, 2000u, -0.50) + step_cmd(now_ms, 3000u, 0.25);
             current_commands.yaw        = 0.0;
             current_commands.throttle   = 0.0;
 
@@ -24,7 +24,7 @@ pilotcommand_s pilot_source_commands(uint32_t now_ms, unsigned id_routine)
             /* pitch identico a ROUTINE_LONGITUDINAL: los canales estan
                desacoplados, asi que el estado longitudinal debe coincidir con
                la linea base de esa rutina (regresion). */
-            current_commands.pitch      = 0.0 + step_cmd(now_ms, 50u, 1.0) + step_cmd(now_ms, 150u, -2.0) + step_cmd(now_ms, 200u, 1.0);
+            current_commands.pitch      = 0.0 + step_cmd(now_ms, 1000u, 0.250) + step_cmd(now_ms, 2000u, -0.50) + step_cmd(now_ms, 3000u, 0.25);
             /* roll: doblete de aleron entre 1.0 y 3.0 s; 0.02 de stick -> 10 us
                -> ~1.8 deg (~0.031 rad) en el aleron (k=0.18 deg/us). */
             current_commands.roll       = step_cmd(now_ms, 1000u, 0.02) + step_cmd(now_ms, 2000u, -0.04) + step_cmd(now_ms, 3000u, 0.02);
