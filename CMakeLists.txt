@@ -163,4 +163,13 @@ if(SIL_BUILD_TESTS)
     target_compile_options(test_sensors PRIVATE -Wall)
     target_link_libraries(test_sensors PRIVATE m)
     add_test(NAME test_sensors COMMAND test_sensors)
+
+    add_executable(test_flight_management
+        test/test_flight_management.c
+        src/flight_management.c
+    )
+    target_include_directories(test_flight_management PRIVATE src test)
+    target_compile_options(test_flight_management PRIVATE -Wall)
+    target_link_libraries(test_flight_management PRIVATE m)
+    add_test(NAME test_flight_management COMMAND test_flight_management)
 endif()
