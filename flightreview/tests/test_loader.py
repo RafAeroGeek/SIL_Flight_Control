@@ -9,7 +9,7 @@ from flightreview.parser.loader import _cache_path, load_log
 def test_carga_basica_y_limpieza(synthetic_csv):
     log = load_log(synthetic_csv)
     assert log.n_samples == 60
-    assert log.df.shape[1] == 50
+    assert log.df.shape[1] == 51
     # El espacio final de 'dphi_rad ' debe quedar limpio.
     assert "dphi_rad" in log.df.columns
     assert "dphi_rad " not in log.df.columns

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Graficas de estados lateral-direccionales del SIL: velocidad lateral dv,
-tasas de alabeo/guinada dp/dr y angulo de alabeo dphi, cada una en su propia
-figura con eje de tiempo enlazado.
+tasas de alabeo/guinada dp/dr, angulo de alabeo dphi y rumbo dpsi, cada una en
+su propia figura con eje de tiempo enlazado.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ _STATES = [
     ("roll_rate", "Tasa de alabeo (dp)", "dp [deg/s]", "latdir_dp_degs", True, 1),
     ("yaw_rate", "Tasa de guinada (dr)", "dr [deg/s]", "latdir_dr_degs", True, 2),
     ("roll", "Angulo de alabeo (dphi)", "dphi [deg]", "latdir_dphi_deg", True, 3),
+    ("yaw", "Rumbo (dpsi)", "dpsi [deg]", "latdir_dpsi_deg", True, 4),
 ]
 
 

@@ -30,12 +30,12 @@ def test_resolve_columns_mapea_canonicos(synthetic_df):
 
 def test_resolve_columns_faltantes_son_none(synthetic_df):
     cmap = resolve_columns(synthetic_df)
-    # No hay yaw ni setpoints de actitud.
-    assert cmap.yaw is None
+    # yaw sale de dpsi_rad; no hay setpoints de actitud.
+    assert cmap.yaw == "dpsi_rad"
     assert cmap.pitch_sp is None
     assert cmap.roll_sp is None
     assert cmap.has("pitch", "gyro_y") is True
-    assert cmap.has("pitch", "yaw") is False
+    assert cmap.has("pitch", "yaw_sp") is False
 
 
 def test_require_time_column_error_claro():

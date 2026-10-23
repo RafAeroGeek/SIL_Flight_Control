@@ -39,7 +39,7 @@ def test_cargar_csv_sin_columnas_laterales(tmp_path, synthetic_df):
 
     # CSV longitudinal (p. ej. linea base previa a v0.2-lateral).
     p = tmp_path / "solo_lon.csv"
-    synthetic_df.drop(columns=["dv_mps", "dp_radps", "dr_radps", "dphi_rad "]).to_csv(p, index=False)
+    synthetic_df.drop(columns=["dv_mps", "dp_radps", "dr_radps", "dphi_rad ", "dpsi_rad"]).to_csv(p, index=False)
     app.cargar_ruta(str(p))
     assert "Error" not in app.estado.text
     tabs = {panel.title: panel for panel in app.tabs_container.tabs}
@@ -47,7 +47,7 @@ def test_cargar_csv_sin_columnas_laterales(tmp_path, synthetic_df):
     for panel in tabs.values():
         assert panel.child.children
     lat_dir = [m for m in _walk(tabs["Dinamica Lat-Dir"].child) if isinstance(m, Plot)]
-    assert len(lat_dir) == 4
+    assert len(lat_dir) == 5
     assert all("(no disponible)" in f.title.text for f in lat_dir)
 
 

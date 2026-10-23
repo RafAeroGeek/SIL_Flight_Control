@@ -29,6 +29,7 @@ REAL_COLUMNS = [
     "laser_alt_m",
     "dv_mps", "dp_radps", "dr_radps",
     "dphi_rad ",  # <-- espacio final deliberado
+    "dpsi_rad",
 ]
 
 N_ROWS = 60
