@@ -109,6 +109,10 @@ void task_init_1ms(void)
     scfg.noise.pitot_dp_noise_std_pa = 5.6;
     scfg.noise.pitot_dp_bias_pa      = 0.0;
 
+    scfg.noise.vane_noise_std_deg  = 0.5;
+    scfg.noise.vane_alpha_bias_deg = 0.0;
+    scfg.noise.vane_beta_bias_deg  = 0.0;
+
     scfg.noise.gyro_noise_std_radps = 0.002;
     scfg.noise.gyro_bias_x_radps    = 0.0;
     scfg.noise.gyro_bias_y_radps    = 0.0;

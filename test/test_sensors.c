@@ -4,6 +4,7 @@
  * (teoría: docs/teoria/sensores/ruido_sensores.tex):
  *   - pitot sin ruido: Δp = 1/2 rho(h) V^2, TAS = V, IAS = V sqrt(rho/rho0)
  *   - pitot con ruido: el ruido está en Δp con la sigma configurada
+ *   - veleta: alpha = atan2(w, u) en el trim; ruido de 0.5° en alpha y beta
  * =========================================================== */
 #include <math.h>
 #include <string.h>
@@ -35,6 +36,7 @@ static void init(FlightSim *sim, SensorsSim *ss, const Params *p, bool ruido)
     cfg.random_seed = 1234u;
     cfg.noise.enable_noise = ruido;
     cfg.noise.pitot_dp_noise_std_pa = 5.6;
+    cfg.noise.vane_noise_std_deg = 0.5;
 
     SensorsSim_Init(ss, &cfg, sim);
 }
@@ -109,10 +111,45 @@ static void test_pitot_ruido(void)
     EXPECT_TRUE(cerca(sd_tas, 5.6 / (rho * p.V0_ms), 0.05 * 0.2));
 }
 
+/* T4: veleta sin ruido -> alpha de trim, beta 0; con ruido -> sigma 0.5° y
+ * alpha y beta sin correlación (dos muestras distintas de la secuencia) */
+static void test_veleta(void)
+{
+    const Params p = base();
+    FlightSim sim;
+    SensorsSim ss;
+
+    init(&sim, &ss, &p, false);
+    SensorsSim_Update(&ss, &sim, 0.0);
+    const SensorVane *v0 = &SensorsSim_GetDataPtr(&ss)->vane;
+    EXPECT_TRUE(v0->valid);
+    EXPECT_TRUE(cerca(v0->AngleOfAttack_deg,
+                      atan2(p.w0_ms, p.u0_ms) * 180.0 / SENSORS_SIM_PI, 1e-9));
+    EXPECT_TRUE(v0->SideSlipAngle_deg == 0.0);
+
+    init(&sim, &ss, &p, true);
+    double a1 = 0, a2 = 0, b1 = 0, b2 = 0, ab = 0;
+    for (int k = 0; k < N_MUESTRAS; ++k) {
+        SensorsSim_Update(&ss, &sim, 0.0);
+        const SensorVane *v = &SensorsSim_GetDataPtr(&ss)->vane;
+        const double a = v->AngleOfAttack_deg, b = v->SideSlipAngle_deg;
+        a1 += a; a2 += a * a; b1 += b; b2 += b * b; ab += a * b;
+    }
+    const double n = N_MUESTRAS;
+    const double sa = sqrt(a2 / n - (a1 / n) * (a1 / n));
+    const double sb = sqrt(b2 / n - (b1 / n) * (b1 / n));
+    const double corr = (ab / n - (a1 / n) * (b1 / n)) / (sa * sb);
+
+    EXPECT_TRUE(cerca(sa, 0.5, 0.025));
+    EXPECT_TRUE(cerca(sb, 0.5, 0.025));
+    EXPECT_TRUE(fabs(corr) < 0.05);
+}
+
 int main(void)
 {
     test_pitot_sin_ruido();
     test_pitot_altitud();
     test_pitot_ruido();
+    test_veleta();
     TEST_RETURN();
 }

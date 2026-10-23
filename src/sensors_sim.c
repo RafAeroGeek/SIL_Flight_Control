@@ -318,8 +318,9 @@ static void SensorSim_UpdateVanes(SensorsSim *ss,
      *   beta   = tan   |-----------------|
      *                  |_ sqrt(u^2+w^2) _|
      *
-     * Sin ruido en beta por ahora: una llamada extra a sensors_noise()
-     * desplazaria toda la secuencia del LCG (rompe la linea base).
+     * Ruido blanco gaussiano y bias en grados, sobre alpha y beta
+     * (secuencia propia SENSORS_RNG_VANE).
+     * Teoría: docs/teoria/sensores/ruido_sensores.tex
      */
     const double u0 = (double)sim->params.u0_ms;
 
@@ -335,11 +336,20 @@ static void SensorSim_UpdateVanes(SensorsSim *ss,
     }
 
     double alpha_rad = atan2(w, u);
-    ss->data.vane.AngleOfAttack_deg = alpha_rad * 57.29577951308;  // rad to deg
-
     double v = sensors_get_v_body_ms(sim);
     double beta_rad = atan2(v, sqrt(u * u + w * w));
-    ss->data.vane.SideSlipAngle_deg = beta_rad * 57.29577951308;   // rad to deg
+
+    double alpha_deg = rad2deg(alpha_rad);
+    double beta_deg  = rad2deg(beta_rad);
+
+    alpha_deg += ss->cfg.noise.vane_alpha_bias_deg;
+    alpha_deg += sensors_noise(ss, SENSORS_RNG_VANE, ss->cfg.noise.vane_noise_std_deg);
+
+    beta_deg += ss->cfg.noise.vane_beta_bias_deg;
+    beta_deg += sensors_noise(ss, SENSORS_RNG_VANE, ss->cfg.noise.vane_noise_std_deg);
+
+    ss->data.vane.AngleOfAttack_deg = alpha_deg;
+    ss->data.vane.SideSlipAngle_deg = beta_deg;
     ss->data.vane.valid = true;
 }
 

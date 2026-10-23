@@ -57,6 +57,11 @@ typedef struct
     double pitot_dp_noise_std_pa;
     double pitot_dp_bias_pa;
 
+    /* Veleta: misma sigma para alpha y beta, bias por ángulo */
+    double vane_noise_std_deg;
+    double vane_alpha_bias_deg;
+    double vane_beta_bias_deg;
+
     /* Gyros */
     double gyro_noise_std_radps;
     double gyro_bias_x_radps;
