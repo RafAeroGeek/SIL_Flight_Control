@@ -55,7 +55,8 @@ SimRc_s rc_source(pilotcommand_s pilot);
 
 /* Ruteo canal RC -> servo: sticks normalizados -> delta PWM [us] de cada
    servo (indice ServoChannel_e), mas el trim del transmisor trim_us[] por
-   servo (NULL = sin trim). Roll -> alerón, pitch -> elevador, yaw -> timón,
+   servo (NULL = sin trim). Roll -> alerón, pitch -> elevador, yaw -> timón
+   (con signo invertido: convención de Nelson, ver RC_YAW_TO_RUDDER_SIGN),
    throttle -> ESC. */
 void rc_to_servo_cmds_us(const SimRc_s *rc,
                          const float trim_us[SERVO_SIM_N_SERVOS],

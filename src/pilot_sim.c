@@ -1,6 +1,11 @@
 #include "pilot_sim.h"
 #include "sim_settings.h"   // RC_STICK_TO_US
 
+/* Signo del timón, convención de Nelson: delta_r > 0 = borde de salida a la
+   izquierda -> fuerza lateral a la derecha y N_dr < 0 (nariz a la izquierda).
+   Pedal derecho (yaw > 0) debe llevar la nariz a la derecha -> delta_r < 0. */
+#define RC_YAW_TO_RUDDER_SIGN   (-1.0f)
+
 //prototipos
 float step_cmd(uint32_t now_ms, uint32_t time_ms , float value);
 
@@ -29,8 +34,9 @@ pilotcommand_s pilot_source_commands(uint32_t now_ms, unsigned id_routine)
             /* roll: doblete de aleron entre 1.0 y 3.0 s; 0.02 de stick -> 10 us
                -> ~1.8 deg (~0.031 rad) en el aleron (k=0.18 deg/us). */
             current_commands.roll       = step_cmd(now_ms, 1000u, 0.02) + step_cmd(now_ms, 2000u, -0.04) + step_cmd(now_ms, 3000u, 0.02);
-            /* yaw: doblete de timon entre 5.0 y 7.0 s; 0.03 de stick -> 15 us
-               -> ~2.7 deg en el rudder (k=0.18 deg/us, tau=0.07 s). */
+            /* yaw: doblete de timon entre 5.0 y 7.0 s; 0.03 de stick (pedal
+               derecho) -> -15 us -> ~-2.7 deg en el rudder (k=0.18 deg/us,
+               tau=0.07 s): nariz a la derecha (convencion de Nelson). */
             current_commands.yaw        = step_cmd(now_ms, 5000u, 0.03) + step_cmd(now_ms, 6000u, -0.06) + step_cmd(now_ms, 7000u, 0.03);
             /* throttle: la planta no usa throttle */
             current_commands.throttle   = 0.0;
@@ -96,7 +102,7 @@ void rc_to_servo_cmds_us(const SimRc_s *rc,
 
     cmd_us[SERVO_AILERON]  = rc->s[RC_CH_ROLL]     * RC_STICK_TO_US;  // Canal 0: Roll -> Aileron
     cmd_us[SERVO_ELEVATOR] = rc->s[RC_CH_PITCH]    * RC_STICK_TO_US;  // Canal 1: Pitch -> Elevator
-    cmd_us[SERVO_RUDDER]   = rc->s[RC_CH_YAW]      * RC_STICK_TO_US;  // Canal 2: Yaw -> Rudder
+    cmd_us[SERVO_RUDDER]   = rc->s[RC_CH_YAW]      * RC_STICK_TO_US * RC_YAW_TO_RUDDER_SIGN;  // Canal 2: Yaw -> Rudder
     cmd_us[SERVO_THROTTLE] = rc->s[RC_CH_THROTTLE] * RC_STICK_TO_US;  // Canal 3: Throttle
 
     /* + trim del transmisor: stick al centro -> superficie en trim */
