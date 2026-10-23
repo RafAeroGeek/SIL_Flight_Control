@@ -1,7 +1,7 @@
 # Status del proyecto — SIL_Flight_Control
 
 **Fecha de revisión:** 2026-10-23
-**Último commit en `main`:** `487045c` Merge PR #16 (test lateral + signo del timón)
+**Último commit en `main`:** `904d171` Merge PR #18 (`dpsi` como 5º estado)
 **Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`), `v0.3-dynamics` (2026-10-22, `717c056`)
 **Versión en `CMakeLists.txt`:** 0.3.0
 
@@ -10,20 +10,26 @@
 ## 1. Estado actual
 
 ### Git
-- `main` al día con `origin/main`; PRs #1–#16 mergeados.
-- Sin ramas pendientes ni stashes; `build_tests/` borrado.
+- `main` al día con `origin/main`; PRs #1–#18 mergeados.
+- **Ojo:** el #19 (diseño del control lateral, F2) estaba apilado sobre
+  `feat/dpsi` y se mergeó dentro de esa rama, no en `main`. Sus commits
+  (`0d14910`, `4211ef3`) siguen en `origin/feat/diseno-control-lateral` y
+  falta llevarlos a `main` con un PR de esa rama.
+- `feat/fm-manual`: F3 (solo MANUAL) + precisión del CSV, en PR.
 
 ### Build y tests (verificado 2026-10-23)
 - Compila con **0 warnings** `-Wall`.
-- **ctest: 10/10** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
+- **ctest: 11/11** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
   `test_aircraft_loader_lat`, `test_lateral_matrices`,
   `test_pilot_lateral_servo`, `test_lon_matrices`, `test_flight_sim_trim`,
-  `test_atmosphere`, `test_sensors`).
-- **pytest: 64/64** (`dynamics/` 16 + `flightreview/` 48).
-- Línea base de regresión vigente: `data/baseline_487045c.csv` (local, no
-  trackeada). Las anteriores ya no aplican.
+  `test_atmosphere`, `test_sensors`, `test_flight_management`).
+- **pytest: 65/65** en `main` (`dynamics/` 16 + `flightreview/` 49); con F2
+  `dynamics/` sube a 24.
+- Línea base de regresión vigente: `data/baseline_cf639a6.csv` (local, no
+  trackeada) para todo salvo giros y acelerómetros, que desde `feat/fm-manual`
+  se escriben con 6 decimales. Las anteriores ya no aplican.
 - Documentación teórica en `docs/teoria/` (LaTeX):
-  `sensores/ruido_sensores.tex`.
+  `sensores/ruido_sensores.tex` y (con F2) `control/control_lateral.tex`.
 
 ### Funcionalidad entregada
 - **v0.1:** dinámica longitudinal `[du, dw, dq, dtheta]`, JSON de aeronave,
@@ -46,6 +52,13 @@
     por sensor.
   - Timón con la convención de Nelson (pedal derecho → δr < 0 → nariz a la
     derecha) y test de la cadena lateral piloto → servo → planta.
+- **Paso 4 en curso (PRs #17–#19 y `feat/fm-manual`):**
+  - `dpsi` como 5º estado (ψ̇ = r·sec θ0), GPS con rumbo (DCM completa),
+    lat/lon con 7 decimales, rumbo en flightreview.
+  - Diseño del control lateral en cascada: ζ_DR 0.10 → 0.83, espiral estable,
+    rumbo sin sobrepaso; el modo rumbo exige el yaw damper.
+  - `flight_management` con modo MANUAL (paso directo, bit a bit); giros y
+    acelerómetros del CSV con 6 decimales.
 
 ### Modos del Ugly Stick (estimación teórica)
 | Modo | λ | ωn [rad/s] | ζ |
@@ -65,8 +78,7 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 ### Media prioridad
 | # | Pendiente |
 |---|---|
-| 8.4 | `dpsi` como 5º estado (GPS `ve` ≠ 0, heading hold) → F1 del Paso 4 |
-| 5.1 / 8.9 | `flight_management.c` y tareas 5/30/150/500 ms de `main.c` vacías → Paso 4 |
+| 5.1 / 8.9 | Modos con lazos en `flight_management.c` y tareas 5/30/150/500 ms de `main.c` vacías → Paso 4 (F3b–F6) |
 | 8.12 | Validar inercias (I_x, I_y, I_z), factores empíricos y σ de pitot/veleta con datos de banco y de vuelo |
 | 8.2 | Contrastar derivadas de control del Navion con Nelson apéndice B |
 
@@ -95,13 +107,16 @@ inserta algo antes de seguir.
 
 | Fase | Contenido |
 |---|---|
-| F1 | `dpsi` como 5º estado: lateral 5x5 (ψ̇ = r·sec θ0), GPS con rumbo, columna `dpsi_rad` |
-| F2 | Diseño de ganancias en Python (clásico en cascada, ζ_DR ≥ 0.4, espiral estable) + `docs/teoria/control/control_lateral.tex` |
-| F3 | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) + AHRS ideal con ruido |
+| F1 ✅ | `dpsi` como 5º estado: lateral 5x5 (ψ̇ = r·sec θ0), GPS con rumbo, columna `dpsi_rad` |
+| F2 ✅* | Diseño de ganancias en Python (clásico en cascada, ζ_DR ≥ 0.4, espiral estable) + `docs/teoria/control/control_lateral.tex` |
+| F3a ✅ | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) — `feat/fm-manual` |
+| F3b | AHRS ideal con ruido + adaptar `FM_Config` (rumbo por alabeo, no por r_cmd) |
 | F4 | Yaw damper |
 | F5 | Modo estabilizado: wing leveler, stick → φ_cmd |
 | F6 | Heading hold + rutina de piloto con cambio de modo |
 | F7 | flightreview con setpoints, docs, tag `v0.4-control` |
+
+\* F2 aprobado (#19) pero aún fuera de `main` (ver Git).
 
 Modos (`mode_switch`): 0 MANUAL, 1 estabilizado, 2 heading hold.
 Fuera de alcance: control longitudinal y estimador de actitud real (AHRS).

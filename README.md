@@ -44,7 +44,7 @@ SIL_Flight_Control/
 | `aircraft_loader`      | Carga parámetros y config de servos desde el JSON     |
 | `sensors_sim`          | Pitot, veleta (α, β), IMU, GPS y láser, ruido y bias  |
 | `atmosphere`           | Densidad ISA (troposfera), igual a `dynamics/`        |
-| `flight_management`    | Capa de control (**tipos definidos, sin implementar**)|
+| `flight_management`    | Capa de control: modo MANUAL (paso directo); lazos en el Paso 4 |
 | `sim_PWM_processing`   | Banco de canales PWM (compilado, aún sin usar)        |
 | `sim_settings.h`       | Selección de plataforma y tiempo de simulación        |
 
@@ -278,13 +278,15 @@ En `src/sim_settings.h`:
   primero, que con la convención de Nelson es δr < 0). `ROUTINE_LONGITUDINAL`
   satura el alerón a 20° y queda solo para la regresión longitudinal.
 
-El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad`.
+El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad, dpsi_rad`.
 
 ## Pendientes conocidos
 
-- `flight_management.c` está prácticamente vacío: `FM_Init`, `FM_Update` y los
-  tres tiers de control están declarados pero no implementados. Las tareas de
-  5, 30, 150 y 500 ms en `main.c` tampoco hacen nada todavía.
+- `flight_management.c` solo implementa el modo MANUAL: `Task_1ms` pasa los
+  sticks por `FM_Update` y la salida es copia exacta de la entrada. Los modos
+  con lazos (yaw damper, estabilizado, rumbo), el AHRS y los tres tiers de
+  control llegan en el Paso 4. Las tareas de 5, 30, 150 y 500 ms en `main.c`
+  tampoco hacen nada todavía.
 - El throttle no realimenta la planta, y su `tau`/`rate_limit` de ESC en
   `servo_sim.c` son valores propuestos sin datos de banco.
 - `sim_PWM_processing` se compila pero nadie lo llama.
