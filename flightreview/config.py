@@ -46,7 +46,9 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "acc_z": ["acc_z_mps2", "accel_z", "acc_z", "imu_accel_z", "az_mps2"],
 
     # --- Extras utiles (no usados por el MVP, pero el parser los resuelve) ---
-    "airspeed": ["pitot_ms", "airspeed_ms", "ARSP", "pitot_airspeed_ms"],
+    "airspeed": ["pitot_ms", "airspeed_ms", "ARSP", "pitot_airspeed_ms"],   # IAS
+    "tas": ["tas_ms", "TAS", "true_airspeed_ms"],
+    "diff_pressure": ["dp_pa", "diff_pressure_pa"],
 
     # --- Sensor de veleta (deg) ---
     "aoa": ["AngleOfAttack_deg", "AoA_deg", "aoa_deg", "alpha_deg"],

@@ -4,6 +4,8 @@
 Si el log trae ``dv_mps`` y la velocidad del pitot, sobrepone en discontinua el
 derrape estimado desde el estado, ``beta_est = atan2(dv, V)``, para contrastarlo
 con la medicion ``SSA_deg`` (el simulador calcula esta con sqrt(u^2+w^2) ~ V).
+V es la TAS (``tas_ms``) si el log la trae; si no, ``pitot_ms`` (en logs
+nuevos es la IAS, ~5 % menor a 1000 m).
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ _V_MIN_MS = 1.0
 
 def _beta_est_deg(log: FlightLog):
     """Derrape estimado desde el estado (deg); None si faltan dv o velocidad."""
-    dv_col, v_col = log.cols.dv, log.cols.airspeed
+    dv_col, v_col = log.cols.dv, log.cols.tas or log.cols.airspeed
     if dv_col is None or v_col is None:
         return None
     dv = log.df_plot[dv_col].to_numpy(dtype=float)
