@@ -7,6 +7,7 @@ independiente por tema; todos comparten `comun/preambulo.tex`.
 | Tema | Documento | Código que describe |
 |---|---|---|
 | Ruido de sensores: pitot, veleta, ISA, generador de ruido | `sensores/ruido_sensores.tex` | `src/sensors_sim.c`, `src/atmosphere.c` |
+| Control lateral: yaw damper, alabeo y rumbo (diseño) | `control/control_lateral.tex` | `dynamics/control_lat_design.py` (F2); `src/flight_management.c` (F3–F6) |
 
 Próximos: dinámica longitudinal y lateral-direccional del Ugly Stick
 (`dinamica_longitudinal/`, `dinamica_lateral/`).
@@ -22,8 +23,12 @@ latexmk -pdf ruido_sensores.tex      # genera ruido_sensores.pdf
 latexmk -c                           # borra auxiliares (deja el PDF)
 ```
 
-En git solo van las fuentes `.tex`; el PDF y los auxiliares están en
-`docs/teoria/.gitignore`.
+En git solo van las fuentes `.tex` y los datos de texto de las figuras
+(`<tema>/datos/*.dat`, generados por los scripts de `dynamics/` y leídos con
+pgfplots); el PDF y los auxiliares están en `docs/teoria/.gitignore`.
+
+Las figuras de `control/` salen de
+`python3 dynamics/control_lat_design.py aircraft/ugly_stick.json --datos docs/teoria/control/datos`.
 
 ## Agregar un documento
 

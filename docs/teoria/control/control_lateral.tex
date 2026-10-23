@@ -1,0 +1,494 @@
+\documentclass[11pt,a4paper]{article}
+\input{../comun/preambulo}
+
+\title{Control lateral-direccional\\[0.3em]
+       \large Yaw damper, alabeo y rumbo en cascada para el Ugly Stick}
+\author{Proyecto \proyecto}
+\date{Octubre de 2026 --- Paso 4 del plan, fase F2 (diseño)}
+
+% Gráficas: datos de dynamics/control_lat_design.py --datos datos/
+\pgfplotsset{
+  diseno/.style={width=0.92\linewidth, height=5.2cm, grid=major,
+                 grid style={gray!25}, tick label style={font=\small},
+                 label style={font=\small}, legend style={font=\footnotesize}},
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Se diseñan las leyes de control lateral-direccional del simulador: un
+\emph{yaw damper} con \emph{washout} sobre el timón, un lazo de alabeo
+($p$, $\phi$) sobre los alerones y un lazo externo de rumbo que comanda el
+ángulo de alabeo. El diseño es clásico, por cierre sucesivo de lazos, sobre el
+mismo modelo lineal que integra el simulador en C, con los servos incluidos.
+Con las ganancias elegidas el \emph{dutch roll} pasa de $\zeta = 0.10$ a
+$0.83$, la espiral queda estable, el alabeo responde en \SI{0.53}{s} con 2\%
+de sobrepaso y el rumbo se establece en \SI{7.6}{s} sin sobrepaso. Todos los
+polos complejos tienen $\zeta \ge 0.42$; los márgenes de ganancia son
+$\ge \SI{22.8}{dB}$ y el lazo tolera \SI{160}{ms} de retardo. El documento
+explica cada decisión, en particular un acoplamiento entre el lazo de rumbo y
+el \emph{dutch roll} que obligó a subir la ganancia del yaw damper.
+\end{abstract}
+
+\tableofcontents
+
+% ============================================================
+\section{Objetivo y alcance}
+% ============================================================
+
+El Ugly Stick en lazo abierto tiene dos problemas laterales (tabla~\ref{tab:la}):
+el \emph{dutch roll} está poco amortiguado ($\zeta = 0.10$, por debajo del mínimo
+de nivel~1 de MIL-F-8785C~\cite{mil8785}, $\zeta \ge 0.19$) y la espiral es
+inestable ($T_2 = \SI{9.3}{s}$). El objetivo del Paso~4 es un piloto automático
+lateral con tres modos, seleccionados con el canal \clave{mode\_switch} del radio:
+
+\begin{center}
+\begin{tabular}{cll}
+\toprule
+\clave{mode\_switch} & Modo & Lazos activos \\
+\midrule
+0 & Manual        & ninguno (stick directo a las superficies) \\
+1 & Estabilizado  & yaw damper + alabeo; el stick de roll comanda $\phi_c$ \\
+2 & Rumbo         & yaw damper + alabeo + rumbo; $\psi_c$ se captura al entrar \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Este documento cubre el \textbf{diseño} (fase F2). La implementación en C es
+de las fases F3--F6; la sección~\ref{sec:impl} fija lo que el C debe respetar.
+Fuera de alcance: control longitudinal y estimación de actitud (el control
+toma $\phi$ y $\psi$ de un AHRS ideal: estado verdadero más ruido).
+
+% ============================================================
+\section{Criterios de diseño}
+% ============================================================
+
+Acordados antes de diseñar; \archivo{dynamics/control\_lat\_design.py} los
+verifica y sale con error si alguno no se cumple:
+
+\begin{center}
+\small
+\begin{tabular}{p{0.46\linewidth}lp{0.27\linewidth}}
+\toprule
+Criterio & Valor & Motivo \\
+\midrule
+$\zeta$ de todo polo complejo en lazo cerrado & $\ge 0.4$ & MIL nivel 1 ($0.19$) con margen \\
+Espiral & estable & modos 1 y 2 \\
+Escalón de $\phi$: sobrepaso / subida 10--90\% & $\le 5\%$ / $\le \SI{0.8}{s}$ & lazo interno rápido y limpio \\
+Escalón de $\psi$: sobrepaso / establecimiento 5\% & $\le 5\%$ / $\le \SI{10}{s}$ & sin pasarse del rumbo \\
+Margen de ganancia (subida) por canal & $\ge \SI{6}{dB}$ & incertidumbre de derivadas \\
+Retardo puro tolerado en ambos canales & $\ge \SI{50}{ms}$ & lazo a \SI{200}{Hz} con holgura \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ============================================================
+\section{Modelo de diseño}
+% ============================================================
+
+\subsection{Planta}
+
+Se usa el modelo lateral del simulador (\func{build\_lateral\_matrices},
+\archivo{src/dynamics.c}), en ejes cuerpo, con el rumbo como quinto estado:
+\begin{equation}
+  \dot{\bm x} = A\bm x + B\bm u, \qquad
+  \bm x = [\,v,\ p,\ r,\ \phi,\ \psi\,]^T, \quad \bm u = [\,\delta_a,\ \delta_r\,]^T,
+\end{equation}
+\begin{equation}
+A = \begin{bmatrix}
+Y_v & Y_p + w_0 & -(u_0 - Y_r) & g\cos\theta_0 & 0\\
+L_v & L_p & L_r & 0 & 0\\
+N_v & N_p & N_r & 0 & 0\\
+0 & 1 & \tan\theta_0 & 0 & 0\\
+0 & 0 & \sec\theta_0 & 0 & 0
+\end{bmatrix},\qquad
+B = \begin{bmatrix}
+0 & Y_{\delta r}\\ L_{\delta a} & L_{\delta r}\\ N_{\delta a} & N_{\delta r}\\ 0 & 0\\ 0 & 0
+\end{bmatrix}.
+\end{equation}
+Las derivadas se leen de \archivo{aircraft/ugly\_stick.json}, el mismo archivo
+que carga el simulador; un test verifica que el bloque $4\times4$ coincide con
+la matriz del C. A la planta se le agregan los \textbf{servos} como sistemas de
+primer orden ($\tau_a = \SI{0.05}{s}$, $\tau_r = \SI{0.07}{s}$, del mismo JSON)
+y el estado del \emph{washout} (sección~\ref{sec:yd}): 8 estados en total.
+
+\subsection{Lazo abierto}
+
+La tabla~\ref{tab:la} resume los modos de la planta sin control. El roll es
+rápido y bien amortiguado; los problemas son el dutch roll y la espiral. El
+quinto eigenvalor, en 0, es el rumbo: $\psi$ no realimenta a nada, solo
+integra $r$.
+
+\begin{table}[!htb]
+\centering
+\caption{Modos laterales del Ugly Stick en lazo abierto (sin servos).}
+\label{tab:la}
+\begin{tabular}{lccc}
+\toprule
+Modo & $\lambda$ & $\omega_n$ [\si{rad/s}] & $\zeta$ \\
+\midrule
+Roll           & $-13.31$            & ---  & --- \\
+Dutch roll     & $-0.413 \pm 4.096j$ & 4.12 & 0.10 \\
+Espiral        & $+0.075$            & ---  & inestable, $T_2 = \SI{9.3}{s}$ \\
+Rumbo          & $0$                 & ---  & integrador ($\psi$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Convención de signos}
+
+Convención de Nelson~\cite{nelson}, la misma del simulador:
+$\delta_a > 0$ produce alabeo a la derecha ($L_{\delta a} = 109.9 > 0$) y
+$\delta_r > 0$ (borde de salida a la izquierda) produce guiñada a la izquierda
+($N_{\delta r} = -9.69 < 0$). Por eso las tres leyes de abajo tienen ganancias
+\textbf{positivas}:
+\begin{align}
+  \delta_r &= K_r\, r_{wo}, \label{eq:yd}\\
+  \delta_a &= K_\phi(\phi_c - \phi) - K_p\, p, \label{eq:roll}\\
+  \phi_c   &= \operatorname{sat}_{\pm\phi_{\max}}\!\bigl(K_\psi(\psi_c - \psi)\bigr). \label{eq:hdg}
+\end{align}
+Un $r > 0$ (nariz a la derecha) da $\delta_r > 0$, que produce un momento de
+guiñada negativo y se opone al movimiento: eso es amortiguar.
+
+% ============================================================
+\section{Yaw damper}
+\label{sec:yd}
+% ============================================================
+
+\subsection{Ley y washout}
+
+El timón realimenta la tasa de guiñada \emph{lavada}:
+\begin{equation}
+  r_{wo} = \frac{\tau_w s}{1 + \tau_w s}\, r,
+  \qquad \tau_w = \SI{1}{s}.
+\end{equation}
+El \emph{washout} es un filtro pasa-altas: deja pasar la oscilación del dutch
+roll ($\omega \approx \SI{4}{rad/s}$, muy por encima de $1/\tau_w$) y bloquea
+la componente constante de $r$. Sin él, en un viraje sostenido
+($r \ne 0$ estacionario) el yaw damper metería timón contra el viraje
+\cite{stevens}. En el modelo de diseño es un estado más,
+$\dot x_{wo} = (r - x_{wo})/\tau_w$ con $r_{wo} = r - x_{wo}$.
+
+\subsection{Elección de \texorpdfstring{$K_r$}{Kr}}
+
+La figura~\ref{fig:lugar} muestra los polos complejos al variar $K_r$ de 0 a
+1.2. El dutch roll se amortigua muy rápido: $K_r = 0.20$ ya da $\zeta = 0.37$ y
+$K_r \approx 0.27$ da $\zeta = 0.5$. Con el yaw damper solo, la espiral sigue
+inestable ($+0.069$): el timón no la corrige, eso le toca al lazo de alabeo.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[diseno, width=0.8\linewidth, xlabel={Parte real [\si{1/s}]}, ylabel={Parte imaginaria [\si{rad/s}]},
+             xmin=-14, xmax=1, ymin=0, ymax=12,
+             colorbar, colormap/viridis, point meta min=0, point meta max=1.2,
+             colorbar style={ylabel={$K_r$}, ylabel style={font=\small}}]
+  \addplot[scatter, only marks, mark=*, mark size=1pt, scatter src=explicit]
+    table[x=re, y=im, meta=Kr] {datos/lugar_yaw_damper.dat};
+  \addplot[only marks, mark=x, mark size=4pt, very thick, red]
+    coordinates {(-0.413,4.096)};
+  \addplot[only marks, mark=o, mark size=4pt, very thick, red]
+    coordinates {(-5.488,3.758) (-2.317,0.554)};
+  \draw[dashed, gray] (axis cs:0,0) -- (axis cs:-13.75,12) node[pos=0.55, above, font=\scriptsize, sloped] {$\zeta=0.75$};
+  \draw[dashed, gray] (axis cs:0,0) -- (axis cs:-5.24,12) node[pos=0.55, above, font=\scriptsize, sloped] {$\zeta=0.4$};
+\end{axis}
+\end{tikzpicture}
+\caption{Lugar de las raíces del yaw damper (polos complejos, servos y washout
+incluidos). $\times$: dutch roll en lazo abierto; $\circ$: $K_r = 0.42$
+(dutch roll en $-5.49 \pm 3.76j$ y un polo lento del washout acoplado en
+$-2.32 \pm 0.55j$).}
+\label{fig:lugar}
+\end{figure}
+
+El valor final, $K_r = 0.42$, es mayor que el que bastaría para el yaw damper
+solo. La razón está en el lazo de rumbo (sección~\ref{sec:acople}). Con
+$K_r = 0.42$ el dutch roll queda en $-5.49 \pm 3.76j$ ($\zeta = 0.83$,
+$\omega_n = \SI{6.65}{rad/s}$).
+
+% ============================================================
+\section{Alabeo}
+\label{sec:alabeo}
+% ============================================================
+
+\subsection{Estructura}
+
+La ley~\eqref{eq:roll} son dos lazos anidados en una sola expresión: $K_p$
+amortigua el alabeo (realimentación de $p$ del giróscopo) y $K_\phi$ cierra la
+actitud. Como $\phi$ integra a $p$, el lazo de $\phi$ es de tipo~1 respecto a
+$\delta_a$ y no necesita integrador para seguir un escalón.
+
+\subsection{Elección de \texorpdfstring{$K_p$ y $K_\phi$}{Kp y Kphi}}
+
+Con el yaw damper cerrado se barrieron $K_p \in \{0.05, 0.10, 0.15\}$ y
+$K_\phi \in [0.3, 1.6]$ midiendo la respuesta al escalón de $\phi_c$:
+
+\begin{center}
+\begin{tabular}{cccccc}
+\toprule
+$K_p$ [\si{s}] & $K_\phi$ & $t_r$ [\si{s}] & sobrepaso & $t_{s,5\%}$ [\si{s}] \\
+\midrule
+0.05 & 0.8 & 0.33 & 3.2\% & 0.54 \\
+0.10 & 0.5 & 0.90 & 3.0\% & 1.19 \\
+\textbf{0.10} & \textbf{0.8} & \textbf{0.55} & \textbf{2.8\%} & \textbf{0.79} \\
+0.10 & 1.2 & 0.27 & 2.5\% & 0.48 \\
+0.15 & 0.8 & 0.69 & 2.4\% & 0.94 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Se eligió $K_p = 0.10$, $K_\phi = 0.8$: cumple con holgura y no es tan agresivo
+como para saturar los alerones con escalones normales. Con $K_\phi = 0.8$, un
+escalón de \SI{30}{\degree} pide de entrada
+$0.8 \times \SI{0.52}{rad} \approx \SI{24}{\degree}$ de alerón y satura brevemente en
+\SI{20}{\degree}; uno de \SI{10}{\degree} pide \SI{5.2}{\degree} como máximo
+(figura~\ref{fig:phi}). Un $K_p$ más alto vuelve oscilatorio el par
+servo--modo de roll ($K_p = 0.2$: $-16.5 \pm 20.6j$, $\zeta = 0.62$).
+
+Con el modo estabilizado (yaw damper + alabeo) todos los polos son estables,
+\textbf{incluida la espiral}, y $\zeta_{\min} = 0.76$. El estado
+estacionario de $\phi$ queda 1.8\% por encima de $\phi_c$: en un viraje
+sostenido $L_r\,r \ne 0$ necesita algo de alerón, que sale de un pequeño error.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[diseno, xlabel={$t$ [\si{s}]}, ylabel={[\si{\degree}], [\si{\degree/s}]},
+             xmin=0, xmax=4, legend pos=north east]
+  \addplot[thick, blue] table[x=t, y=phi_deg] {datos/escalon_phi.dat};
+  \addlegendentry{$\phi$}
+  \addplot[thick, red, dashed] table[x=t, y=da_deg] {datos/escalon_phi.dat};
+  \addlegendentry{$\delta_a$}
+  \addplot[thick, green!50!black, dotted] table[x=t, y=r_dps] {datos/escalon_phi.dat};
+  \addlegendentry{$r$}
+  \addplot[gray, densely dashed] coordinates {(0,10) (4,10)};
+\end{axis}
+\end{tikzpicture}
+\caption{Escalón de $\phi_c = \SI{10}{\degree}$ en modo estabilizado (modelo
+lineal con servos).}
+\label{fig:phi}
+\end{figure}
+
+% ============================================================
+\section{Rumbo}
+\label{sec:rumbo}
+% ============================================================
+
+\subsection{Ley}
+
+En un viraje coordinado $\dot\psi = (g/V)\tan\phi \approx (g/V)\,\phi$
+\cite{beard}, así que un lazo proporcional~\eqref{eq:hdg} que comanda $\phi_c$
+da, si el lazo de alabeo es mucho más rápido, una respuesta de primer orden
+con constante $\tau_\psi \approx V/(g K_\psi) = \SI{2.6}{s}$ para $K_\psi = 1$.
+La regla de separación de anchos de banda~\cite{beard} pide que el lazo externo
+sea al menos 5 veces más lento que el interno; el de alabeo tiene
+$t_r = \SI{0.53}{s}$, así que $K_\psi \approx 1$ está en el límite razonable.
+El error de rumbo se envuelve a $[-\pi, \pi)$ y $\phi_c$ se limita a
+$\pm\phi_{\max} = \pm\SI{30}{\degree}$.
+
+\subsection{Acoplamiento con el dutch roll}
+\label{sec:acople}
+
+Al cerrar el lazo de rumbo sobre el diseño inicial ($K_r = 0.27$) apareció un
+par de polos cerca de \SI{2.9}{rad/s} cuyo amortiguamiento \emph{cae} al
+subir $K_\psi$, hasta volverse inestable en $K_\psi \approx 2$
+(figura~\ref{fig:acople}). Es el dutch roll ya amortiguado: el rumbo se
+corrige con alerón, el alerón tiene guiñada adversa
+($N_{\delta a} = -2.51$) y esa guiñada excita el dutch roll a través del
+lazo. Con $K_r = 0.27$, para tener $\zeta \ge 0.4$ habría que bajar a
+$K_\psi \approx 0.5$ (rumbo en $\sim\SI{15}{s}$).
+
+La solución fue subir el yaw damper: con $K_r = 0.42$ se llega a
+$K_\psi = 1.0$ con $\zeta_{\min} = 0.42$. Más $K_r$ (0.60) da más margen en
+$\zeta$, pero el dutch roll se parte en dos polos reales y la actividad del
+timón crece sin beneficio en la respuesta de rumbo.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[diseno, xlabel={$K_\psi$}, ylabel={$\zeta_{\min}$ en modo rumbo},
+             xmin=0.2, xmax=2, ymin=0, ymax=0.8, legend pos=north east]
+  \addplot[thick, red] table[x=Kpsi, y=zmin_Kr027] {datos/zeta_rumbo.dat};
+  \addlegendentry{$K_r = 0.27$}
+  \addplot[thick, blue] table[x=Kpsi, y=zmin_Kr042] {datos/zeta_rumbo.dat};
+  \addlegendentry{$K_r = 0.42$ (elegido)}
+  \addplot[thick, green!50!black, dashed] table[x=Kpsi, y=zmin_Kr060] {datos/zeta_rumbo.dat};
+  \addlegendentry{$K_r = 0.60$}
+  \addplot[gray, densely dashed] coordinates {(0.2,0.4) (2,0.4)};
+  \addplot[only marks, mark=o, mark size=3pt, blue, thick] coordinates {(1.0,0.42)};
+\end{axis}
+\end{tikzpicture}
+\caption{Amortiguamiento mínimo de los polos complejos en modo rumbo contra
+$K_\psi$ ($K_p = 0.10$, $K_\phi = 0.8$). Línea punteada: criterio
+$\zeta \ge 0.4$.}
+\label{fig:acople}
+\end{figure}
+
+\subsection{Respuesta}
+
+Con $K_\psi = 1.0$ (figura~\ref{fig:psi}) un cambio de rumbo de
+\SI{30}{\degree} se completa sin sobrepaso: subida en \SI{4.9}{s},
+establecimiento al 5\% en \SI{7.6}{s}, sin error estacionario. El alabeo
+pedido llega a $\approx\SI{30.5}{\degree}$, justo en el límite de
+$\phi_{\max}$. Dos detalles de la figura: al principio $\psi$ baja unos
+\SI{3}{\degree}, que es la guiñada adversa del alerón ($N_{\delta a} < 0$)
+mientras el avión entra en el viraje; y la meseta entre 2 y \SI{3}{s} es el
+modo menos amortiguado del lazo ($-1.06 \pm 2.27j$, $\zeta = 0.42$,
+sección~\ref{sec:acople}). Cambios de rumbo mayores quedan limitados por la saturación
+(viraje a \SI{30}{\degree} de alabeo, $\dot\psi \approx \SI{13}{\degree/s}$). El
+timón se mueve poco ($\le \SI{8.6}{\degree}$, ya que el washout deja pasar solo
+el transitorio).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[diseno, xlabel={$t$ [\si{s}]}, ylabel={[\si{\degree}]},
+             xmin=0, xmax=15, legend pos=north east]
+  \addplot[thick, blue] table[x=t, y=psi_deg] {datos/escalon_psi.dat};
+  \addlegendentry{$\psi$}
+  \addplot[thick, orange] table[x=t, y=phi_deg] {datos/escalon_psi.dat};
+  \addlegendentry{$\phi$}
+  \addplot[thick, red, dashed] table[x=t, y=da_deg] {datos/escalon_psi.dat};
+  \addlegendentry{$\delta_a$}
+  \addplot[thick, green!50!black, dotted] table[x=t, y=dr_deg] {datos/escalon_psi.dat};
+  \addlegendentry{$\delta_r$}
+  \addplot[gray, densely dashed] coordinates {(0,30) (15,30)};
+\end{axis}
+\end{tikzpicture}
+\caption{Escalón de $\psi_c = \SI{30}{\degree}$ en modo rumbo (modelo lineal,
+sin la saturación de $\phi_c$).}
+\label{fig:psi}
+\end{figure}
+
+% ============================================================
+\section{Robustez}
+% ============================================================
+
+Se evaluó en el modo rumbo, el más exigente, de dos formas:
+
+\paragraph{Rango de ganancia por canal.} Multiplicando por $k$ la ley de un
+canal (con el otro en su valor nominal) y buscando el rango de $k$ estable:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Canal & $k$ estable & Margen al subir & Margen al bajar \\
+\midrule
+Alerón ($K_p$, $K_\phi$, $K_\psi$) & $(0,\ >50]$ & $> \SI{34}{dB}$ & cualquier $k > 0$ \\
+Timón ($K_r$)                         & $[0.14,\ 13.8]$ & \SI{22.8}{dB} & \SI{-17.1}{dB} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+El límite inferior del timón tiene una lectura importante: \textbf{en modo
+rumbo el yaw damper es imprescindible}. Con menos del 14\% de $K_r$ el
+acoplamiento de la sección~\ref{sec:acople} desestabiliza el dutch roll. Si el
+yaw damper falla en vuelo, el modo 2 debe desactivarse.
+
+\paragraph{Retardo puro.} Con un retardo $T$ en ambas entradas (aproximación
+de Padé de orden 2) el lazo sigue estable hasta $T = \SI{160}{ms}$. El lazo
+en C correrá a \SI{200}{Hz}: el retenedor de orden cero equivale a
+$\approx\SI{2.5}{ms}$ de retardo, dos órdenes de magnitud por debajo.
+
+% ============================================================
+\section{Implementación prevista en C}
+\label{sec:impl}
+% ============================================================
+
+Lo que las fases F3--F6 deben respetar para que el C reproduzca este diseño:
+
+\begin{itemize}
+  \item \textbf{Frecuencia}: leyes en \func{Task\_5ms} (\SI{200}{Hz}).
+  \item \textbf{Entradas}: $p$, $r$ del giróscopo (con ruido); $\phi$, $\psi$
+        del AHRS ideal. Unidades en grados o radianes indistintamente: las
+        ganancias son adimensionales ($K_p$ en segundos).
+  \item \textbf{Washout discreto} (Euler hacia atrás, estable para cualquier
+        $\Delta t$):
+        $x_{wo,k} = x_{wo,k-1} + \frac{\Delta t}{\tau_w + \Delta t}(r_k - x_{wo,k-1})$,
+        $r_{wo,k} = r_k - x_{wo,k}$.
+  \item \textbf{Salidas}: $\delta_a$, $\delta_r$ son deflexiones
+        \emph{respecto al trim}; el C las pasa a comando de servo en
+        \si{\micro s} con $u = \delta/k_{\text{servo}} + \text{trim}_{us}$
+        (y signo de Nelson, sin la inversión del pedal, que es solo del piloto).
+  \item \textbf{Saturaciones}: $\phi_c \in \pm\SI{30}{\degree}$; las de
+        las superficies ($\pm\SI{20}{\degree}$, $\pm\SI{30}{\degree}$) y los
+        limitadores de velocidad ya están en los servos.
+  \item \textbf{Modo 1}: $\phi_c = \phi_{\max}\cdot$\,stick de roll; el pedal se
+        suma al yaw damper como mando directo.
+  \item \textbf{Modo 2}: $\psi_c$ se captura al entrar al modo; con el stick
+        de roll fuera de una banda muerta el piloto manda $\phi_c$ y al
+        soltarlo se recaptura el rumbo. Error de rumbo envuelto a
+        $[-\pi,\pi)$.
+  \item \textbf{Cambios de modo}: reiniciar el estado del washout al entrar a
+        un modo con yaw damper, para evitar escalones de timón.
+\end{itemize}
+
+% ============================================================
+\section{Resumen y reproducción}
+% ============================================================
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Ganancia & Valor & Unidad & Lazo \\
+\midrule
+$K_r$          & 0.42 & \si{rad/(rad/s)} & yaw damper (timón) \\
+$\tau_w$       & 1.0  & \si{s}           & washout \\
+$K_p$          & 0.10 & \si{rad/(rad/s)} & amortiguamiento de alabeo (alerón) \\
+$K_\phi$       & 0.80 & \si{rad/rad}     & actitud de alabeo (alerón) \\
+$K_\psi$       & 1.00 & \si{rad/rad}     & rumbo $\rightarrow \phi_c$ \\
+$\phi_{\max}$  & 30   & \si{\degree}     & límite de $\phi_c$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Para reproducir los números y las figuras, desde la raíz del repo:
+\begin{lstlisting}
+python3 dynamics/control_lat_design.py aircraft/ugly_stick.json \
+    --datos docs/teoria/control/datos
+\end{lstlisting}
+El script escribe \archivo{dynamics/ugly\_control\_lat.json} (ganancias,
+polos, respuestas y márgenes) y los \archivo{.dat} de las figuras. Si se
+cambian las derivadas del avión o los servos, hay que volver a correrlo: sale
+con error si el diseño deja de cumplir los criterios.
+
+% ============================================================
+\section{Limitaciones}
+% ============================================================
+
+\begin{itemize}
+  \item Diseño sobre el \textbf{modelo lineal} en una sola condición de vuelo
+        (\SI{25.25}{m/s}, \SI{1000}{m}). Las derivadas escalan con $\bar q$:
+        a otra velocidad las ganancias cambian de efecto (sin
+        \emph{gain scheduling} por ahora).
+  \item Derivadas \textbf{estimadas}, no medidas (TODO 8.12). Los márgenes de
+        ganancia son amplios, pero el acoplamiento de la
+        sección~\ref{sec:acople} depende de $N_{\delta a}$ y conviene
+        revisarlo cuando haya datos de vuelo.
+  \item Actitud de un \textbf{AHRS ideal}: un estimador real agrega retardo y
+        error en $\phi$ y $\psi$.
+  \item Sin turbulencia ni viento: el rumbo es el de la nariz, no el de la
+        trayectoria (sin corrección por deriva).
+\end{itemize}
+
+% ============================================================
+\begin{thebibliography}{9}
+% ============================================================
+\bibitem{nelson}
+R.~C. Nelson, \emph{Flight Stability and Automatic Control}, 2.ª ed.
+McGraw-Hill, 1998, caps.~5 y 9.
+
+\bibitem{stevens}
+B.~L. Stevens, F.~L. Lewis y E.~N. Johnson, \emph{Aircraft Control and
+Simulation}, 3.ª ed. Wiley, 2016, cap.~4 (yaw damper con washout).
+
+\bibitem{beard}
+R.~W. Beard y T.~W. McLain, \emph{Small Unmanned Aircraft: Theory and
+Practice}. Princeton University Press, 2012, cap.~6 (cierre sucesivo de lazos).
+
+\bibitem{mil8785}
+MIL-F-8785C, \emph{Military Specification: Flying Qualities of Piloted
+Airplanes}, 1980.
+\end{thebibliography}
+
+\end{document}
