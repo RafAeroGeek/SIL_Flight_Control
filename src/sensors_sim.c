@@ -175,6 +175,62 @@ static double sensors_get_phi_rad(const FlightSim *sim)
     return sim->X_lat[3];
 }
 
+static void sensors_get_v_ned_ms(const FlightSim *sim,
+                                 double *vn, double *ve, double *vd)
+{
+    double u = sensors_get_u_body_ms(sim);
+    double w = sensors_get_w_body_ms(sim);
+    double theta = sensors_get_theta_rad(sim);
+
+    /*
+     * Conversión cuerpo -> NED simplificada longitudinal.
+     *
+     * Asumimos:
+     * - no hay velocidad lateral
+     * - no hay heading todavía
+     * - todo se mueve sobre el eje Norte
+     *
+     * ve = 0 mientras no exista dpsi como estado (el modelo lateral
+     * tiene solo [dv, dp, dr, dphi]).
+     *
+     * V_N = u cos(theta) + w sin(theta)
+     * V_D = -u sin(theta) + w cos(theta)
+     */
+    *vn = u * cos(theta) + w * sin(theta);
+    *ve = 0.0;
+    *vd = -u * sin(theta) + w * cos(theta);
+}
+
+/* ============================================================
+ * Posición verdadera (navegación)
+ * ============================================================ */
+
+/* Integra lat, lon y altitud verdaderas. Va antes de los sensores: la
+ * altitud alimenta la ISA del pitot, el GPS y el láser. */
+static void SensorsSim_PropagateNav(SensorsSim *ss,
+                                    const FlightSim *sim,
+                                    double dt_s)
+{
+    if (dt_s <= 0.0) return;
+
+    double vn, ve, vd;
+    sensors_get_v_ned_ms(sim, &vn, &ve, &vd);
+
+    double d_north = vn * dt_s;
+    double d_east  = ve * dt_s;
+    double d_down  = vd * dt_s;
+
+    double cos_lat = cos(ss->lat_rad);
+
+    if (fabs(cos_lat) < 1.0e-6) {
+        cos_lat = 1.0e-6;
+    }
+
+    ss->lat_rad += d_north / SENSORS_SIM_EARTH_RADIUS_M;
+    ss->lon_rad += d_east / (SENSORS_SIM_EARTH_RADIUS_M * cos_lat);
+    ss->alt_m   -= d_down;
+}
+
 /* ============================================================
  * Modelos de sensores
  * ============================================================ */
@@ -353,52 +409,15 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
 }
 
 static void SensorsSim_UpdateGps(SensorsSim *ss,
-                                 const FlightSim *sim,
-                                 double dt_s)
+                                 const FlightSim *sim)
 {
     if (!ss->cfg.gps_enabled) {
         ss->data.gps.valid = false;
         return;
     }
 
-    double u = sensors_get_u_body_ms(sim);
-    double w = sensors_get_w_body_ms(sim);
-    double theta = sensors_get_theta_rad(sim);
-
-    /*
-     * Conversión cuerpo -> NED simplificada longitudinal.
-     *
-     * Asumimos:
-     * - no hay velocidad lateral
-     * - no hay heading todavía
-     * - todo se mueve sobre el eje Norte
-     *
-     * ve = 0 mientras no exista dpsi como estado (el modelo lateral
-     * tiene solo [dv, dp, dr, dphi]).
-     *
-     * V_N = u cos(theta) + w sin(theta)
-     * V_D = -u sin(theta) + w cos(theta)
-     */
-    double vn = u * cos(theta) + w * sin(theta);
-    double ve = 0.0;
-    double vd = -u * sin(theta) + w * cos(theta);
-
-    /* Integración de posición */
-    if (dt_s > 0.0) {
-        double d_north = vn * dt_s;
-        double d_east  = ve * dt_s;
-        double d_down  = vd * dt_s;
-
-        double cos_lat = cos(ss->lat_rad);
-
-        if (fabs(cos_lat) < 1.0e-6) {
-            cos_lat = 1.0e-6;
-        }
-
-        ss->lat_rad += d_north / SENSORS_SIM_EARTH_RADIUS_M;
-        ss->lon_rad += d_east / (SENSORS_SIM_EARTH_RADIUS_M * cos_lat);
-        ss->alt_m   -= d_down;
-    }
+    double vn, ve, vd;
+    sensors_get_v_ned_ms(sim, &vn, &ve, &vd);
 
     double lat_m_noise = sensors_noise(ss, ss->cfg.noise.gps_pos_noise_std_m);
     double lon_m_noise = sensors_noise(ss, ss->cfg.noise.gps_pos_noise_std_m);
@@ -513,10 +532,12 @@ void SensorsSim_Update(SensorsSim *ss,
 
     ss->data.t_s = sim->t_s;
 
+    SensorsSim_PropagateNav(ss, sim, dt_s);
+
     SensorsSim_UpdatePitot(ss, sim);
     SensorSim_UpdateVanes(ss, sim);
     SensorsSim_UpdateImu(ss, sim, dt_s);
-    SensorsSim_UpdateGps(ss, sim, dt_s);
+    SensorsSim_UpdateGps(ss, sim);
     SensorsSim_UpdateLaser(ss);
 
     ss->prev_u_ms = u;
