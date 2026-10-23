@@ -103,12 +103,20 @@ Supuestos: canales desacoplados (integrar el lateral no cambia el
 longitudinal); no hay `dpsi`, así que la velocidad Este del GPS sigue en 0.
 Los sensores usan los mismos ejes: `w = w0 + dw` y `θ = θ0 + dθ`.
 
+**Trim de superficies.** Los servos dan la deflexión absoluta; la planta
+integra la perturbación `dδ = δ − δ_trim` (`FlightSim_SetActuatorsFromFM`,
+`src/flight_sim.c`). Para que con el stick al centro la superficie quede en
+trim, `main.c` suma al comando de cada servo un trim de transmisor
+`δ_trim / k_deg_per_us` [µs] y arranca el servo en `δ_trim` (en lugar de
+`servo_*_y0_deg`). En el Ugly Stick: δe_trim = −0.49°, k = 0.04 → −12.2 µs.
+
 ### Claves JSON nuevas (`aircraft/*.json`)
 
 | Clave | Unidad | Nota |
 |---|---|---|
 | `theta0_deg` | deg | cabeceo de trim (γ0 + atan2(w0, u0)) |
 | `X_de` | m/s² | longitudinal, opcional (default 0) |
+| `delta_e_trim_deg` | deg | elevador de trim, absoluto (lo escribe `a_aircraft.py`) |
 | `I_x`, `I_z`, `I_xz` | kg·m² | inercias (default `I_x = I_z = 1`) |
 | `Y_v` | 1/s | fuerza lateral |
 | `Y_p`, `Y_r` | m/s | fuerza lateral |
@@ -157,9 +165,9 @@ python3 test/compare_csv_cols.py data/baseline_<commit_base>.csv data/SIL_sim_se
 
 La línea base puede generarse con `ROUTINE_LONGITUDINAL` y la comparación
 correrse con `ROUTINE_LAT_DIR`: ambas rutinas tienen el mismo `pitch`, así que el
-estado longitudinal debe coincidir. La línea base vigente es `5ea17b6` (modelo
-en ejes cuerpo con `ugly_stick.json` generado desde `dynamics/`); las anteriores
-(`4affdca`, `f1b6478`) ya no aplican.
+estado longitudinal debe coincidir. La línea base vigente es `e041d25` (ejes
+cuerpo, trim del elevador −0.49° y servo de elevador con k = 0.04 deg/µs); las
+anteriores (`5ea17b6`, `4affdca`, `f1b6478`) ya no aplican.
 
 ## Derivadas de estabilidad (`dynamics/`)
 

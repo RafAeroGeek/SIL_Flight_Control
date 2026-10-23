@@ -20,12 +20,13 @@
 
 ### Build y tests (verificado 2026-10-21)
 - Compila con **0 warnings** `-Wall` (6.1 hecho en PR #9).
-- **ctest: 6/6** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
-  `test_aircraft_loader_lat`, `test_lateral_matrices`, `test_lon_matrices`).
+- **ctest: 7/7** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
+  `test_aircraft_loader_lat`, `test_lateral_matrices`, `test_lon_matrices`,
+  `test_flight_sim_trim`).
 - **pytest: 62/62** (`dynamics/` 16 + `flightreview/` 46).
-- Línea base de regresión vigente: `data/baseline_5ea17b6.csv` (local, no
-  trackeada). Las anteriores (`4affdca`, `0959bad`, `f1b6478`,
-  `pitch_unificado`) ya no aplican.
+- Línea base de regresión vigente: `data/baseline_e041d25.csv` (local, no
+  trackeada; trim del elevador y k = 0.04). La anterior (`5ea17b6`) ya no
+  aplica.
 
 ### Funcionalidad entregada
 - **v0.1:** dinámica longitudinal `[du, dw, dq, dtheta]`, JSON de aeronave,
@@ -65,13 +66,11 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 ### Media prioridad
 | # | Pendiente |
 |---|---|
-| 8.13 | Trim del elevador: δe_trim se calcula pero `delta_e_trim_deg` queda en 0 porque el C usa el elevador absoluto como perturbación. Restar el trim antes de la planta. |
 | 8.12 | Validar inercias (I_x, I_y, I_z) y factores empíricos lon/lat con péndulo bifilar y dobletes en vuelo |
 | 3.2 / 6.3 | Test `test_pilot_lateral_servo.c` + registrarlo en ctest |
 | 8.2 | Contrastar derivadas de control del Navion con Nelson apéndice B |
 | 8.3 | Decidir convención de signo del timón (yaw>0 → dr<0) |
 | 8.4 | `dpsi` como 5º estado (GPS `ve` ≠ 0, heading hold) |
-| — | Doblete de pitch: lleva el elevador a ±22° y dθ > 2 rad, fuera del rango del modelo lineal. Reducir amplitud de la rutina (cambia la línea base). |
 
 ### Baja prioridad / v0.3
 | # | Pendiente |
@@ -98,10 +97,12 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 4. Tag `v0.3-dynamics` (o similar) sobre `main` para marcar el modelo en ejes
    cuerpo con derivadas del Ugly Stick; subir `CMakeLists.txt` de versión.
 
-### Paso 1 — Planta coherente con el trim (8.13 + amplitud del doblete)
-- Restar δe_trim antes de la planta y escribirlo desde `a_aircraft.py`.
-- Reducir la amplitud del doblete para quedar en rango lineal.
-- Ambos cambian la línea base: un commit cada uno, regenerar al final.
+### Paso 1 — Planta coherente con el trim (8.13) ✅ 2026-10-22
+- La planta resta δ_trim; trim de transmisor en `main.c`; `a_aircraft.py`
+  escribe `delta_e_trim_deg`.
+- Servo de elevador con k = 0.04 deg/µs (valor real): el doblete queda en
+  −0.49 ± 5° y ya no satura el modelo lineal; la amplitud de la rutina no se
+  cambia.
 
 ### Paso 2 — Fidelidad de sensores (4.1 pitot + 8.7)
 - Portar la ISA a C (ρ(h) en el pitot), separar TAS/IAS, ruido en presión

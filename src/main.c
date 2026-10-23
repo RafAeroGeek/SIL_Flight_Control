@@ -28,6 +28,11 @@ static FM_Actuators g_act;
 static SensorsSim g_sensors;
 static SensorsSimData g_sens_data;
 
+/* Trim del transmisor [us], uno por servo: el comando del piloto se suma a
+   este offset para que con el stick al centro la superficie quede en su
+   delta_*_trim_deg. Se calcula en task_init_1ms. */
+static float g_trim_us[SERVO_SIM_N_SERVOS];
+
 // CSV
 #if (SYSTEM_SIM_ENV == SIM_PLATFORM_PC)
 FILE *g_fp = NULL;
@@ -39,6 +44,7 @@ const char *csv_path = "data/SIL_sim_servos2.csv";
 
 /* ====== Prototipos ====== */
 static void print_params(const Params *p);
+static void aplicar_trim_servo(ServoCfg_s cfg[SERVO_SIM_N_SERVOS], int canal, float trim_deg);
 
 static void Task_1ms(uint32_t now_ms, uint32_t dt_ms);
 static void Task_5ms(uint32_t now_ms, uint32_t dt_ms);
@@ -129,6 +135,9 @@ void task_init_1ms(void)
     ServoCfg_s servo_cfg[SERVO_SIM_N_SERVOS];
     Servos_GetDefaultCfg(servo_cfg);
     (void)Aircraft_LoadServoCfg(AIRCRAFT_JSON_PATH, servo_cfg);
+    aplicar_trim_servo(servo_cfg, SERVO_ELEVATOR, g_params.delta_e_trim_deg);
+    aplicar_trim_servo(servo_cfg, SERVO_AILERON,  g_params.delta_a_trim_deg);
+    aplicar_trim_servo(servo_cfg, SERVO_RUDDER,   g_params.delta_r_trim_deg);
     Servos_Init_All_Cfg(servo_cfg);
 
     #if(SYSTEM_SIM_ENV == SIM_PLATFORM_PC)
@@ -234,6 +243,16 @@ int main(int argc, char **argv)
  * Tareas
  * =============================== */
 
+/* Trim del transmisor de un canal: offset de comando que deja la superficie
+   en trim_deg en estado estacionario (y_ss = k*u) y arranque del servo ya en
+   trim. Sustituye al servo_*_y0_deg del JSON. */
+static void aplicar_trim_servo(ServoCfg_s cfg[SERVO_SIM_N_SERVOS], int canal, float trim_deg)
+{
+    const float k = cfg[canal].k_deg_per_us;
+    g_trim_us[canal] = (fabsf(k) > 1e-9f) ? trim_deg / k : 0.0f;
+    cfg[canal].y0_deg = trim_deg;
+}
+
 static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 {
     const float dt_s = (float)dt_ms * 0.001f;
@@ -249,9 +268,10 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
      /* Comandos para cada servo basados en los canales RC */
      /* Canales RC en unidades normalizadas -> delta PWM [us] (RC_STICK_TO_US) */
-     float aile_cmd = rc_sim.s[RC_CH_ROLL]     * RC_STICK_TO_US;  // Canal 0: Roll -> Aileron
-     float elev_cmd = rc_sim.s[RC_CH_PITCH]    * RC_STICK_TO_US;  // Canal 1: Pitch -> Elevator
-     float rud_cmd  = rc_sim.s[RC_CH_YAW]      * RC_STICK_TO_US;  // Canal 2: Yaw -> Rudder
+     /* + trim del transmisor: stick al centro -> superficie en trim */
+     float aile_cmd = rc_sim.s[RC_CH_ROLL]     * RC_STICK_TO_US + g_trim_us[SERVO_AILERON];   // Canal 0: Roll -> Aileron
+     float elev_cmd = rc_sim.s[RC_CH_PITCH]    * RC_STICK_TO_US + g_trim_us[SERVO_ELEVATOR];  // Canal 1: Pitch -> Elevator
+     float rud_cmd  = rc_sim.s[RC_CH_YAW]      * RC_STICK_TO_US + g_trim_us[SERVO_RUDDER];    // Canal 2: Yaw -> Rudder
      float thro_cmd = rc_sim.s[RC_CH_THROTTLE] * RC_STICK_TO_US;  // Canal 3: Throttle
 
      /* Opcional: flaps, modo, armado */

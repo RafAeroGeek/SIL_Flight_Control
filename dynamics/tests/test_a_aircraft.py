@@ -119,6 +119,9 @@ def test_trim_en_ejes_cuerpo(avion_tmp):
     assert -p["u0_ms"] * math.sin(th) + p["w0_ms"] * math.cos(th) == pytest.approx(0.0, abs=1e-4)
     Z_de_s = lon["espacio_de_estados"]["B"][1][0]
     assert p["X_de"] == pytest.approx(-math.sin(a) * Z_de_s, rel=1e-5)
+    assert p["delta_e_trim_deg"] == pytest.approx(
+        lon["condicion_vuelo"]["delta_e_trim_deg"], rel=1e-5)
+    assert p["delta_e_trim_deg"] != 0.0
 
 
 def test_lateral_sin_giro_es_beta_a_dv():

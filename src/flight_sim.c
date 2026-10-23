@@ -116,11 +116,12 @@ void FlightSim_SetActuatorsFromFM(FlightSim *sim, const FM_Actuators *act)
 {
     if (!sim || !sim->initialized || !act) return;
 
-    /* Aquí tú defines tu convención:
-       si act->elevator es [-1,1] conviértelo a rad o a delta_e físico. */
-    sim->delta_elv = (double)DEG_TO_RAD(act->elevator);
-    sim->delta_ail = (double)DEG_TO_RAD(act->aileron);
-    sim->delta_rud = (double)DEG_TO_RAD(act->rudder);
+    /* act trae la deflexión absoluta de la superficie [deg]; la planta lineal
+       integra la perturbación respecto al trim: d_delta = delta - delta_trim [rad]. */
+    const Params *p = &sim->params;
+    sim->delta_elv = (double)DEG_TO_RAD(act->elevator - p->delta_e_trim_deg);
+    sim->delta_ail = (double)DEG_TO_RAD(act->aileron  - p->delta_a_trim_deg);
+    sim->delta_rud = (double)DEG_TO_RAD(act->rudder   - p->delta_r_trim_deg);
     sim->throttle  = (double)act->throttle;
 }
 
