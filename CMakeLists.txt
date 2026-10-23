@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(SIL_Flight_Control
-        VERSION 0.2.0
+        VERSION 0.3.0
         DESCRIPTION "Simulador SIL de control de vuelo (dinamica longitudinal + lateral-direccional + sensores)"
         LANGUAGES C)
 
