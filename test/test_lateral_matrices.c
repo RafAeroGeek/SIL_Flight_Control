@@ -6,6 +6,7 @@
  *   - I_x = 0 no produce NaN/Inf
  *   - respuesta libre acotada y espiral estable (rk4_step_n)
  *   - ejes cuerpo: +w0 en A[0][1] y tan(theta0) en A[3][2]
+ *   - dpsi (5º estado): dpsi' = sec(theta0) dr, sin realimentación
  * =========================================================== */
 #include "dynamics.h"
 #include "test_util.h"
@@ -43,24 +44,26 @@ static Params navion(void)
 static void test_navion_ixz_cero(void)
 {
     const Params p = navion();
-    double A[4][4], B[4][2];
+    double A[DYN_N_LAT][DYN_N_LAT], B[DYN_N_LAT][DYN_M_LAT];
     build_lateral_matrices(&p, A, B);
 
     const double tol = 1e-6;
-    const double A_exp[4][4] = {
-        { -0.254f,   0.0f,   -(53.6448f - 0.0f), 9.81 },
-        { -0.29863f, -8.40f,  2.19f,             0.0  },
-        {  0.08370f, -0.35f, -0.76f,             0.0  },
-        {  0.0,       1.0,    0.0,               0.0  },
+    const double A_exp[DYN_N_LAT][DYN_N_LAT] = {
+        { -0.254f,   0.0f,   -(53.6448f - 0.0f), 9.81, 0.0 },
+        { -0.29863f, -8.40f,  2.19f,             0.0,  0.0 },
+        {  0.08370f, -0.35f, -0.76f,             0.0,  0.0 },
+        {  0.0,       1.0,    0.0,               0.0,  0.0 },
+        {  0.0,       0.0,    1.0,               0.0,  0.0 },
     };
-    const double B_exp[4][2] = {
+    const double B_exp[DYN_N_LAT][DYN_M_LAT] = {
         {  0.0,      3.80f   },
         { 28.98f,    2.548f  },
         { -0.2218f, -4.597f  },
         {  0.0,      0.0     },
+        {  0.0,      0.0     },
     };
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) EXPECT_NEAR(A[i][j], A_exp[i][j], tol);
+    for (int i = 0; i < DYN_N_LAT; ++i) {
+        for (int j = 0; j < DYN_N_LAT; ++j) EXPECT_NEAR(A[i][j], A_exp[i][j], tol);
         for (int k = 0; k < 2; ++k) EXPECT_NEAR(B[i][k], B_exp[i][k], tol);
     }
     EXPECT_TRUE(A[0][2] == -((double)53.6448f - 0.0));
@@ -73,7 +76,7 @@ static void test_correccion_ixz(void)
     Params p = navion();
     p.I_x = 1000.0f; p.I_z = 2000.0f; p.I_xz = 100.0f;
 
-    double A[4][4], B[4][2];
+    double A[DYN_N_LAT][DYN_N_LAT], B[DYN_N_LAT][DYN_M_LAT];
     build_lateral_matrices(&p, A, B);
 
     const double D = 0.995;
@@ -98,35 +101,36 @@ static void test_ix_cero(void)
     Params p = navion();
     p.I_x = 0.0f; p.I_xz = 100.0f;
 
-    double A[4][4], B[4][2];
+    double A[DYN_N_LAT][DYN_N_LAT], B[DYN_N_LAT][DYN_M_LAT];
     build_lateral_matrices(&p, A, B);
 
     int bad = 0;
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) if (!isfinite(A[i][j])) bad++;
+    for (int i = 0; i < DYN_N_LAT; ++i) {
+        for (int j = 0; j < DYN_N_LAT; ++j) if (!isfinite(A[i][j])) bad++;
         for (int k = 0; k < 2; ++k) if (!isfinite(B[i][k])) bad++;
     }
     EXPECT_TRUE(bad == 0);
     EXPECT_NEAR(A[1][1], (double)-8.40f, 1e-12);
 }
 
-/* T4: respuesta libre desde dphi0 = 0.1 rad, 30 s, dt = 1 ms. */
+/* T4: respuesta libre desde dphi0 = 0.1 rad, 30 s, dt = 1 ms. Alabeado a la
+   derecha el avión gira a la derecha: dpsi crece. */
 static void test_respuesta_libre_navion(void)
 {
     const Params p = navion();
-    double A[4][4], B[4][2];
+    double A[DYN_N_LAT][DYN_N_LAT], B[DYN_N_LAT][DYN_M_LAT];
     build_lateral_matrices(&p, A, B);
 
     const double U[2] = {0.0, 0.0};
     const double dt = 0.001;
-    double X[4] = {0.0, 0.0, 0.0, 0.1};
-    double Xn[4];
+    double X[DYN_N_LAT] = {0.0, 0.0, 0.0, 0.1, 0.0};
+    double Xn[DYN_N_LAT];
     double max_v = 0.0, max_p = 0.0, max_r = 0.0;
 
     for (int k = 0; k < 30000; ++k) {
-        EXPECT_TRUE(rk4_step_n(linear_dynamics_n, 4u, 2u, X, U, dt,
+        EXPECT_TRUE(rk4_step_n(linear_dynamics_n, DYN_N_LAT, DYN_M_LAT, X, U, dt,
                                &A[0][0], &B[0][0], Xn));
-        for (int i = 0; i < 4; ++i) X[i] = Xn[i];
+        for (int i = 0; i < DYN_N_LAT; ++i) X[i] = Xn[i];
         if (fabs(X[0]) > max_v) max_v = fabs(X[0]);
         if (fabs(X[1]) > max_p) max_p = fabs(X[1]);
         if (fabs(X[2]) > max_r) max_r = fabs(X[2]);
@@ -137,8 +141,9 @@ static void test_respuesta_libre_navion(void)
     EXPECT_TRUE(max_r < 2.0);
     /* espiral estable y lento: phi decae pero sigue positivo */
     EXPECT_TRUE(X[3] > 0.0 && X[3] < 0.1);
-    printf("T4: dphi(30 s) = %.6f rad, max|dv| = %.4f, max|dp| = %.4f, max|dr| = %.4f\n",
-           X[3], max_v, max_p, max_r);
+    EXPECT_TRUE(X[4] > 0.0);
+    printf("T4: dphi(30 s) = %.6f rad, dpsi(30 s) = %.4f rad, max|dv| = %.4f, max|dp| = %.4f, max|dr| = %.4f\n",
+           X[3], X[4], max_v, max_p, max_r);
 }
 
 /* T5: ejes cuerpo, w0 = 2.6 m/s y theta0 = 6 deg */
@@ -147,7 +152,7 @@ static void test_ejes_cuerpo(void)
     Params p = navion();
     p.w0_ms = 2.6f; p.theta0_deg = 6.0f;
 
-    double A[4][4], B[4][2];
+    double A[DYN_N_LAT][DYN_N_LAT], B[DYN_N_LAT][DYN_M_LAT];
     build_lateral_matrices(&p, A, B);
 
     const double th = (double)6.0f * M_PI / 180.0;
@@ -155,6 +160,8 @@ static void test_ejes_cuerpo(void)
     EXPECT_NEAR(A[3][2], tan(th), 1e-12);
     EXPECT_NEAR(A[0][3], 9.81 * cos(th), 1e-12);
     EXPECT_TRUE(A[3][1] == 1.0);
+    EXPECT_NEAR(A[4][2], 1.0 / cos(th), 1e-12);
+    for (int i = 0; i < DYN_N_LAT; ++i) EXPECT_TRUE(A[i][4] == 0.0);  // dpsi no realimenta
 }
 
 int main(void)

@@ -76,7 +76,7 @@ void task_init_1ms(void)
 
     ic.t0_s     = 0.0;
     ic.X0[0]    = 0.0; ic.X0[1] = 0.0; ic.X0[2] = 0.0; ic.X0[3] = 0.0;  // [du,dw,dq,dtheta]
-    ic.X0_lat[0] = 0.0; ic.X0_lat[1] = 0.0; ic.X0_lat[2] = 0.0; ic.X0_lat[3] = 0.0;  // [dv,dp,dr,dphi]
+    for (int i = 0; i < DYN_N_LAT; ++i) ic.X0_lat[i] = 0.0;  // [dv,dp,dr,dphi,dpsi]
     ic.H0_m     = (double)g_params.Alt_m;
 
     ic.delta_elv0 = 0.0;
@@ -150,8 +150,8 @@ void task_init_1ms(void)
 
         imprimir_matriz_4x4(g_sim.A_lon, g_sim.B_lon);
         #if (SIL_CONFIG_LATERAL == 1)
-            imprimir_matriz("A_lat [dv,dp,dr,dphi]", &g_sim.A_lat[0][0], 4u, 4u);
-            imprimir_matriz("B_lat [da,dr]",         &g_sim.B_lat[0][0], 4u, 2u);
+            imprimir_matriz("A_lat [dv,dp,dr,dphi,dpsi]", &g_sim.A_lat[0][0], DYN_N_LAT, DYN_N_LAT);
+            imprimir_matriz("B_lat [da,dr]",              &g_sim.B_lat[0][0], DYN_N_LAT, DYN_M_LAT);
         #endif
 
         printf("Actuadores inicializados:\n");
@@ -180,7 +180,7 @@ void task_init_1ms(void)
                         "gps_lat_deg,gps_lon_deg,gps_alt_m,"                // GPS data
                         "gps_vn_ms,gps_ve_ms,gps_vd_ms,"
                         "laser_alt_m,"                                      // Laser
-                        "dv_mps,dp_radps,dr_radps,dphi_rad\n" );            // Estado lateral-direccional
+                        "dv_mps,dp_radps,dr_radps,dphi_rad,dpsi_rad\n" );   // Estado lateral-direccional
 
             fflush(g_fp);
             printf("CSV abierto: %s\n", csv_path);
@@ -308,7 +308,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
      double dtheta = g_sim.X_lon[3];
 
      /* Estado lateral-direccional (queda en 0 con SIL_CONFIG_LATERAL == 0) */
-     double X_lat[4];
+     double X_lat[DYN_N_LAT];
      FlightSim_GetX_lat(&g_sim, X_lat);
 
      FlightSim_GetActuators(&g_act, y_ail, y_elev, y_rud, y_thro);
@@ -347,7 +347,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.3f,%.3f,%.3f,"       // gps data
                     "%.3f,%.3f,%.3f,"       // gps vn ve vd
                     "%.6f,"                 // Laser
-                    "%.6f,%.6f,%.6f,%.6f\n", // dv, dp, dr, dphi
+                    "%.6f,%.6f,%.6f,%.6f,%.6f\n", // dv, dp, dr, dphi, dpsi
                     (double)t_s,                                            // 1. tiempo
                     (double)servo_cmd_us[SERVO_ELEVATOR], (double)servo_cmd_us[SERVO_AILERON],  // comandos us
                     (double)servo_cmd_us[SERVO_RUDDER], (double)servo_cmd_us[SERVO_THROTTLE],
@@ -389,7 +389,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
                     (double)g_sens_data.laser.range_m,                      // Laser
 
-                    X_lat[0], X_lat[1], X_lat[2], X_lat[3] );               // dv, dp, dr, dphi
+                    X_lat[0], X_lat[1], X_lat[2], X_lat[3], X_lat[4] );     // dv, dp, dr, dphi, dpsi
 
             /* Flush cada 100 ms */
             if ((now_ms % 100u) == 0u) {

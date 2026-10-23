@@ -14,6 +14,11 @@ static void copy4(double dst[4], const double src[4])
     for (int i = 0; i < 4; ++i) dst[i] = src[i];
 }
 
+static void copy_lat(double dst[DYN_N_LAT], const double src[DYN_N_LAT])
+{
+    for (int i = 0; i < DYN_N_LAT; ++i) dst[i] = src[i];
+}
+
 void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
 {
     if (!sim || !p) return;
@@ -32,7 +37,7 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
     FlightSimInit def = {0};
     def.t0_s = 0.0;
     def.X0[0] = 0.0; def.X0[1] = 0.0; def.X0[2] = 0.0; def.X0[3] = 0.0;
-    def.X0_lat[0] = 0.0; def.X0_lat[1] = 0.0; def.X0_lat[2] = 0.0; def.X0_lat[3] = 0.0;
+    for (int i = 0; i < DYN_N_LAT; ++i) def.X0_lat[i] = 0.0;
     def.H0_m = (double)p->Alt_m;
 
     def.delta_elv0 = 0.0;
@@ -48,7 +53,7 @@ void FlightSim_Init(FlightSim *sim, const Params *p, const FlightSimInit *ic)
 
     sim->t_s = cfg->t0_s;
     copy4(sim->X_lon, cfg->X0);
-    copy4(sim->X_lat, cfg->X0_lat);
+    copy_lat(sim->X_lat, cfg->X0_lat);
     sim->H_m = cfg->H0_m;
 
     sim->delta_elv = cfg->delta_elv0;
@@ -167,9 +172,9 @@ void FlightSim_Step(FlightSim *sim, double dt_s)
 #if (SIL_CONFIG_LATERAL == 1)
     /* Canal lateral desacoplado: no toca X_lon. u = [da, dr] en rad. */
     const double U_lat[2] = { sim->delta_ail, sim->delta_rud };
-    rk4_step_n(linear_dynamics_n, 4u, 2u, sim->X_lat, U_lat, dt_s,
+    rk4_step_n(linear_dynamics_n, DYN_N_LAT, DYN_M_LAT, sim->X_lat, U_lat, dt_s,
                &sim->A_lat[0][0], &sim->B_lat[0][0], sim->Xn_lat);
-    copy4(sim->X_lat, sim->Xn_lat);
+    copy_lat(sim->X_lat, sim->Xn_lat);
 #endif
 
     sim->t_s += dt_s;
@@ -187,8 +192,8 @@ void FlightSim_GetX(const FlightSim *sim, double out_X4[4])
     copy4(out_X4, sim->X_lon);
 }
 
-void FlightSim_GetX_lat(const FlightSim *sim, double out_X4[4])
+void FlightSim_GetX_lat(const FlightSim *sim, double out_X[DYN_N_LAT])
 {
-    if (!sim || !out_X4) return;
-    copy4(out_X4, sim->X_lat);
+    if (!sim || !out_X) return;
+    copy_lat(out_X, sim->X_lat);
 }

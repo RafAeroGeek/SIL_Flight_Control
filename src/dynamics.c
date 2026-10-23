@@ -43,14 +43,16 @@ void build_state_space_matrices(const Params *p, double A[4][4], double B[4])
  *    y cinematica linealizada dphi/dt = dp + tan(theta0) dr.
  *    Con w0 = 0 y theta0 = 0 queda la forma de Nelson (ejes de estabilidad).
  *  - Canales longitudinal y lateral desacoplados (modelo lineal).
- *  - Sin dpsi: 4 estados.
+ *  - Quinto estado dpsi (rumbo), cinematica linealizada
+ *    dpsi/dt = (q sin(phi) + r cos(phi)) / cos(theta) ~ dr / cos(theta0).
  *
  * El JSON trae L_x, N_x sin asterisco. Con D = 1 - I_xz^2/(I_x*I_z):
  *   L*x = L_x/D ; N*x = N_x/D
  *   fila L: L*x + (I_xz/I_x)*N*x ; fila N: N*x + (I_xz/I_z)*L*x
  * para x en {v, p, r, da, dr}. Con I_xz = 0 queda la forma de Nelson 5.x.
  */
-void build_lateral_matrices(const Params *p, double A[4][4], double B[4][2])
+void build_lateral_matrices(const Params *p, double A[DYN_N_LAT][DYN_N_LAT],
+                            double B[DYN_N_LAT][DYN_M_LAT])
 {
     double Ix  = (double)p->I_x;
     double Iz  = (double)p->I_z;
@@ -81,17 +83,19 @@ void build_lateral_matrices(const Params *p, double A[4][4], double B[4][2])
     const double w0     = (double)p->w0_ms;
     const double theta0 = (double)p->theta0_deg * M_PI / 180.0;
 
-    // Matriz A
-    A[0][0] = p->Y_v;  A[0][1] = p->Y_p + w0; A[0][2] = -(u0 - p->Y_r); A[0][3] = DYN_GRAVITY_MPS2 * cos(theta0);
-    A[1][0] = Lc[0];   A[1][1] = Lc[1];       A[1][2] = Lc[2];          A[1][3] = 0.0;
-    A[2][0] = Nc[0];   A[2][1] = Nc[1];       A[2][2] = Nc[2];          A[2][3] = 0.0;
-    A[3][0] = 0.0;     A[3][1] = 1.0;         A[3][2] = tan(theta0);    A[3][3] = 0.0;
+    // Matriz A (la columna de dpsi es 0: el rumbo no realimenta)
+    A[0][0] = p->Y_v;  A[0][1] = p->Y_p + w0; A[0][2] = -(u0 - p->Y_r);     A[0][3] = DYN_GRAVITY_MPS2 * cos(theta0); A[0][4] = 0.0;
+    A[1][0] = Lc[0];   A[1][1] = Lc[1];       A[1][2] = Lc[2];              A[1][3] = 0.0;                            A[1][4] = 0.0;
+    A[2][0] = Nc[0];   A[2][1] = Nc[1];       A[2][2] = Nc[2];              A[2][3] = 0.0;                            A[2][4] = 0.0;
+    A[3][0] = 0.0;     A[3][1] = 1.0;         A[3][2] = tan(theta0);        A[3][3] = 0.0;                            A[3][4] = 0.0;
+    A[4][0] = 0.0;     A[4][1] = 0.0;         A[4][2] = 1.0 / cos(theta0);  A[4][3] = 0.0;                            A[4][4] = 0.0;
 
-    // Matriz B (4x2): columnas [da, dr]
+    // Matriz B (5x2): columnas [da, dr]
     B[0][0] = 0.0;     B[0][1] = p->Y_dr;
     B[1][0] = Lc[3];   B[1][1] = Lc[4];
     B[2][0] = Nc[3];   B[2][1] = Nc[4];
     B[3][0] = 0.0;     B[3][1] = 0.0;
+    B[4][0] = 0.0;     B[4][1] = 0.0;
 }
 
 void longitudinal_dynamics(const double X[4], double U,
