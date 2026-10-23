@@ -18,15 +18,17 @@
   - `stash@{3}`: un `data.zip` de 3.4 MB → revisarlo antes de descartar.
 - Carpeta `build_tests/` en la raíz: build viejo (ignorado por git), residuo.
 
-### Build y tests (verificado 2026-10-21)
+### Build y tests (verificado 2026-10-22)
 - Compila con **0 warnings** `-Wall` (6.1 hecho en PR #9).
-- **ctest: 7/7** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
+- **ctest: 9/9** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
   `test_aircraft_loader_lat`, `test_lateral_matrices`, `test_lon_matrices`,
-  `test_flight_sim_trim`).
-- **pytest: 62/62** (`dynamics/` 16 + `flightreview/` 46).
-- Línea base de regresión vigente: `data/baseline_e041d25.csv` (local, no
-  trackeada; trim del elevador y k = 0.04). La anterior (`5ea17b6`) ya no
-  aplica.
+  `test_flight_sim_trim`, `test_atmosphere`, `test_sensors`).
+- **pytest: 64/64** (`dynamics/` 16 + `flightreview/` 48).
+- Línea base de regresión vigente: `data/baseline_2220e20.csv` (local, no
+  trackeada; pitot con Δp/ISA, ruido de veleta, LCG por sensor). Las
+  anteriores (`e041d25`, `5ea17b6`) ya no aplican.
+- Documentación teórica en `docs/teoria/` (LaTeX):
+  `sensores/ruido_sensores.tex`.
 
 ### Funcionalidad entregada
 - **v0.1:** dinámica longitudinal `[du, dw, dq, dtheta]`, JSON de aeronave,
@@ -61,7 +63,7 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 ### Alta prioridad
 | # | Pendiente | Nota |
 |---|---|---|
-| 4.1 | Modelo de pitot | `SensorsSim_UpdatePitot` (`src/sensors_sim.c`) sigue con `rho0 = 1.225` fijo y ruido sobre la velocidad. Ya existe `dynamics/atmosfera.py` (ISA) como referencia para portar a C. Cambia la línea base (agrupar con 8.7). |
+| — | — | 4.1 (pitot) hecho el 2026-10-22. |
 
 ### Media prioridad
 | # | Pendiente |
@@ -77,7 +79,6 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 |---|---|
 | 5.1 / 8.9 | `flight_management.c` y tareas 5/30/150/500 ms de `main.c` vacías |
 | 8.14 | `aircraft_a.json` (lon manual, lat Navion) se integra ahora en ejes cuerpo con `w0_ms = 4.71`: regenerarla o poner `w0_ms = 0` |
-| 8.7 | Ruido en veleta β (regenera línea base: desplaza el LCG) |
 | 8.8 | Migrar longitudinal a `rk4_step_n` y borrar `rk4_step` |
 | 8.11 | Typo `L_v` en diapositivas |
 | 7.1 / 7.2 | Roadmap en README, diagrama de flujo de ramas |
@@ -104,9 +105,9 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
   −0.49 ± 5° y ya no satura el modelo lineal; la amplitud de la rutina no se
   cambia.
 
-### Paso 2 — Fidelidad de sensores (4.1 pitot + 8.7)
-- Portar la ISA a C (ρ(h) en el pitot), separar TAS/IAS, ruido en presión
-  dinámica; ruido en β. Una sola regeneración de línea base.
+### Paso 2 — Fidelidad de sensores (4.1 pitot + 8.7) ✅ 2026-10-22
+- ISA en C, pitot con ruido en Δp e IAS/TAS, ruido en α y β, LCG por sensor.
+  Teoría en `docs/teoria/sensores/ruido_sensores.tex`.
 
 ### Paso 3 — Tests de integración lateral (3.2 / 6.3)
 - `test_pilot_lateral_servo.c`: escalones en alerón y timón, saturación,
