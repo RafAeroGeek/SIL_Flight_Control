@@ -344,7 +344,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.6f,%.6f,%.6f,%.6f,%.6f,"  // IAS, TAS, Δp, AoA, SideSlip
                     "%.3f,%.3f,%.3f,"       // giros
                     "%.3f,%.3f,%.3f,"       // acelerometros
-                    "%.3f,%.3f,%.3f,"       // gps data
+                    "%.7f,%.7f,%.3f,"       // gps lat, lon [deg] (1e-7 deg ~ 1 cm), alt
                     "%.3f,%.3f,%.3f,"       // gps vn ve vd
                     "%.6f,"                 // Laser
                     "%.6f,%.6f,%.6f,%.6f,%.6f\n", // dv, dp, dr, dphi, dpsi
