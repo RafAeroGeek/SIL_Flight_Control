@@ -260,6 +260,12 @@ anterior tenía $u_0$ donde va $V_0$ (error relativo $1 - \cos\alpha_0 \approx
 con el estado total, la forma no lineal \eqref{eq:V} es exacta y no cuesta
 más.
 
+\paragraph{Consecuencia para la regresión.} Como $V$ incluye $v$, las columnas
+del pitot (\clave{pitot\_ms}, \clave{tas\_ms}, \clave{dp\_pa}) ya no son
+puramente longitudinales: una maniobra lateral las cambia (en el séptimo
+decimal en la rutina \texttt{ROUTINE\_LAT\_DIR}, porque $V$ depende de $v^2$).
+La comparación cruzada entre rutinas del README ya no las incluye.
+
 \subsection{Presión de impacto: hipótesis incompresible}
 
 Por Bernoulli incompresible la presión diferencial es la presión dinámica:
