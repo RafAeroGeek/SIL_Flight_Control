@@ -111,6 +111,18 @@ if(SIL_BUILD_TESTS)
     target_link_libraries(test_lateral_matrices PRIVATE m)
     add_test(NAME test_lateral_matrices COMMAND test_lateral_matrices)
 
+    add_executable(test_pilot_lateral_servo
+        test/test_pilot_lateral_servo.c
+        src/pilot_sim.c
+        src/servo_sim.c
+        src/flight_sim.c
+        src/dynamics.c
+    )
+    target_include_directories(test_pilot_lateral_servo PRIVATE src test)
+    target_compile_options(test_pilot_lateral_servo PRIVATE -Wall)
+    target_link_libraries(test_pilot_lateral_servo PRIVATE m)
+    add_test(NAME test_pilot_lateral_servo COMMAND test_pilot_lateral_servo)
+
     add_executable(test_lon_matrices
         test/test_lon_matrices.c
         src/dynamics.c
