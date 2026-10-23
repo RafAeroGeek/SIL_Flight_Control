@@ -1,0 +1,561 @@
+\documentclass[11pt,a4paper]{article}
+\input{../comun/preambulo}
+
+\title{Modelos de sensores y de ruido\\[0.3em]
+       \large Pitot, veleta, atmósfera ISA y generador de ruido}
+\author{Proyecto \proyecto}
+\date{Octubre de 2026 --- versión del código 0.3 (TODO 4.1 y 8.7)}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Este documento describe los modelos de medición del tubo pitot y de la veleta
+de ángulo de ataque y derrape del simulador \proyecto, junto con la atmósfera
+estándar ISA y el generador de ruido pseudoaleatorio que usan todos los
+sensores. Para cada modelo se da la ecuación que implementa el código, el
+archivo y la función donde está, la justificación de los supuestos, la
+propagación del ruido a las salidas y la verificación numérica. La intención
+es que quien toque \archivo{src/sensors\_sim.c} sepa exactamente qué está
+modelando y qué no.
+\end{abstract}
+
+\tableofcontents
+
+% ============================================================
+\section{Alcance y convenciones}
+% ============================================================
+
+El simulador integra un modelo lineal de pequeñas perturbaciones en
+\textbf{ejes cuerpo} alrededor de una condición de trim (vuelo recto y
+nivelado). Los sensores, en cambio, se alimentan del \emph{estado total}
+reconstruido a partir del trim más la perturbación:
+\begin{equation}
+  u = u_0 + \Delta u, \qquad v = \Delta v, \qquad w = w_0 + \Delta w,
+  \qquad \theta = \theta_0 + \Delta\theta,
+  \label{eq:estado-total}
+\end{equation}
+con $u_0 = V_0\cos\alpha_0$, $w_0 = V_0\sin\alpha_0$ y $\theta_0 = \alpha_0 + \gamma_0$.
+Las funciones \func{sensors\_get\_u\_body\_ms}, \func{sensors\_get\_v\_body\_ms} y
+\func{sensors\_get\_w\_body\_ms} de \archivo{src/sensors\_sim.c} hacen esta
+reconstrucción.
+
+Condición de referencia usada en los números de este documento (Ugly Stick,
+\archivo{aircraft/ugly\_stick.json}):
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Magnitud & Valor & Nota \\
+\midrule
+Altitud $h$            & \SI{1000}{m}            & ISA \\
+Velocidad $V_0$        & \SI{25.25}{m/s}         & TAS \\
+Ángulo de ataque $\alpha_0$ & \SI{5.92}{\degree} & $=\theta_0$ ($\gamma_0 = 0$) \\
+Densidad $\rho(h)$     & \SI{1.1116}{kg/m^3}     & ec.~\eqref{eq:isa-rho} \\
+Presión dinámica $\bar q$ & \SI{354.37}{Pa}      & $\tfrac12\rho V_0^2$ \\
+Número de Mach $M$     & 0.0751                  & $a = \SI{336.4}{m/s}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Todos los sensores se actualizan cada paso del simulador, $\Delta t = \SI{1}{ms}$
+(\SI{1}{kHz}), dentro de \func{SensorsSim\_Update}.
+
+% ============================================================
+\section{Modelo general de medición y generador de ruido}
+\label{sec:ruido}
+% ============================================================
+
+\subsection{Modelo de medición}
+
+Cada canal de sensor sigue el modelo aditivo
+\begin{equation}
+  y_k = h(\bm{x}_k) + b + \nu_k, \qquad \nu_k \sim \Normal(0,\sigma^2)
+  \ \text{i.i.d.},
+  \label{eq:medicion}
+\end{equation}
+donde $h(\bm{x})$ es la magnitud verdadera calculada del estado, $b$ un sesgo
+(\emph{bias}) constante y $\nu_k$ ruido blanco gaussiano, independiente entre
+muestras y entre canales. El ruido se suma en la magnitud \emph{física que mide
+el transductor} (presión en el pitot, ángulo en la veleta, velocidad angular en
+el giróscopo), no en una magnitud derivada.
+
+El ruido es blanco a la frecuencia de muestreo $f_s = \SI{1}{kHz}$: su densidad
+espectral de potencia unilateral equivalente es $S = 2\sigma^2/f_s$. Si más
+adelante el código filtra o diezma una señal, la varianza de la salida se
+reduce en proporción al ancho de banda.
+
+\subsection{Generador congruencial lineal (LCG)}
+
+El ruido se genera con un LCG de 32 bits (constantes de
+\emph{Numerical Recipes}~\cite{press}), en \func{sensors\_lcg\_next}:
+\begin{equation}
+  x_{k+1} = (a\,x_k + c) \bmod 2^{32}, \qquad a = 1664525,\quad c = 1013904223 .
+\end{equation}
+Se usa porque es determinista, barato y se comporta igual en PC y en un
+microcontrolador (STM32), lo que permite comparar corridas bit a bit. Se toman
+los 24 bits bajos para formar una uniforme $U_k = (x_k \mathbin{\&} \texttt{0xFFFFFF})/2^{24}
+\in [0,1)$.
+
+\subsection{Aproximación de la normal: suma de 12 uniformes}
+
+En \func{sensors\_rand\_normal}:
+\begin{equation}
+  Z = \sum_{i=1}^{12} U_i - 6, \qquad \nu = \sigma Z .
+\end{equation}
+$Z$ sigue la distribución de Irwin--Hall desplazada: $\E[Z]=0$ y
+$\operatorname{Var}[Z] = 12\cdot\tfrac{1}{12} = 1$ exactamente. Diferencias con
+una normal verdadera:
+\begin{itemize}
+  \item Colas acotadas: $|Z| \le 6$, es decir no hay muestras más allá de
+        $6\sigma$ (en una normal la probabilidad es $2\times10^{-9}$).
+  \item Exceso de curtosis $-0.1$ (colas algo más ligeras).
+\end{itemize}
+Para ruido de sensores en simulación esto es suficiente; si algún día se
+necesitan colas realistas (detección de fallas, \emph{outliers}) habría que
+cambiar a Box--Muller.
+
+\subsection{Una secuencia por sensor}
+
+Antes, todos los sensores compartían un único estado del LCG: el número que
+recibía cada canal dependía de cuántas llamadas al generador se hacían antes
+en el mismo paso. Agregar ruido a un sensor desplazaba la secuencia de
+\emph{todos} los que venían después y cambiaba la línea base de regresión
+completa.
+
+Ahora hay un estado por sensor (\texttt{SensorsRng\_e} en
+\archivo{src/sensors\_sim.h}):
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Secuencia & Sensor & Muestras por paso \\
+\midrule
+\texttt{SENSORS\_RNG\_PITOT} & pitot ($\dpm$)                     & 1 \\
+\texttt{SENSORS\_RNG\_VANE}  & veleta ($\alpha$, $\beta$)         & 2 \\
+\texttt{SENSORS\_RNG\_IMU}   & giróscopos y acelerómetros         & 6 \\
+\texttt{SENSORS\_RNG\_GPS}   & posición y velocidad GPS           & 6 \\
+\texttt{SENSORS\_RNG\_LASER} & altímetro láser                    & 1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Las semillas se derivan de la semilla global $s$ (\clave{random\_seed}) con
+una mezcla tipo \emph{splitmix32} (\func{sensors\_seed\_stream}):
+\begin{align}
+  z &= s + (k+1)\cdot\texttt{0x9E3779B9} \pmod{2^{32}},\\
+  z &\leftarrow (z \oplus (z \gg 16))\cdot\texttt{0x85EBCA6B},\quad
+  z \leftarrow (z \oplus (z \gg 13))\cdot\texttt{0xC2B2AE35},\quad
+  z \leftarrow z \oplus (z \gg 16),
+\end{align}
+con $k$ el índice de la secuencia (y $z=0 \Rightarrow z=1$). La mezcla evita
+que dos secuencias del mismo LCG sean la misma desplazada unos pocos pasos.
+En una corrida de \SI{1}{s} en trim (1000 muestras) la correlación máxima entre
+cualquier par de canales es $|r| < 0.08$, compatible con independencia
+($1/\sqrt{1000} \approx 0.03$).
+
+Consecuencia práctica: agregar el ruido de la veleta no cambió ni un bit de las
+columnas del pitot, la IMU, el GPS ni el láser.
+
+% ============================================================
+\section{Atmósfera estándar ISA}
+\label{sec:isa}
+% ============================================================
+
+Implementada en \func{Atmosphere\_IsaDensity} (\archivo{src/atmosphere.c}),
+con las mismas constantes que \archivo{dynamics/atmosfera.py}, de modo que el
+análisis de derivadas y el simulador usan la misma densidad. Troposfera
+($h < \SI{11}{km}$), gradiente térmico constante~\cite{iso2533}:
+\begin{align}
+  T(h) &= T_0 - L\,h, \\
+  \rho(h) &= \rhoo \left(\frac{T(h)}{T_0}\right)^{\frac{g_0}{R L} - 1}.
+  \label{eq:isa-rho}
+\end{align}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Constante & Valor & Unidad & Macro en C \\
+\midrule
+$\rhoo$ & 1.225      & \si{kg/m^3}  & \texttt{ISA\_RHO0\_KG\_M3} \\
+$T_0$   & 288.15     & \si{K}       & \texttt{ISA\_T0\_K} \\
+$L$     & 0.0065     & \si{K/m}     & \texttt{ISA\_L\_K\_M} \\
+$R$     & 287.05287  & \si{J/(kg.K)}& \texttt{ISA\_R\_J\_KG\_K} \\
+$g_0$   & 9.80665    & \si{m/s^2}   & \texttt{ISA\_G0\_MPS2} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+El exponente vale $g_0/(RL) - 1 = 4.2559$. Fuera de $[0, \SI{11000}{m}]$ la
+altitud se satura (el código en C no aborta, a diferencia del de Python que
+lanza una excepción). Verificación (\archivo{test/test\_atmosphere.c}, mismos
+puntos que \archivo{dynamics/tests/test\_atmosfera.py}):
+
+\begin{center}
+\begin{tabular}{rcc}
+\toprule
+$h$ [\si{m}] & $\rho$ tabla ISA [\si{kg/m^3}] & $\rho$ calculada \\
+\midrule
+0    & 1.2250 & 1.2250 \\
+1000 & 1.1117 & 1.1116 \\
+5000 & 0.7361 & 0.7361 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La altitud que entra a la ISA es la \emph{verdadera}, integrada en
+\func{SensorsSim\_PropagateNav} a partir de $V_D$ antes de actualizar los
+sensores.
+
+% ============================================================
+\section{Tubo pitot}
+\label{sec:pitot}
+% ============================================================
+
+\subsection{Cadena de medición}
+
+Un tubo pitot-estático conectado a un sensor de presión diferencial mide la
+diferencia entre la presión total y la estática, $\dpm = p_t - p_s$. El
+autopiloto convierte esa presión en velocidad. El modelo
+(\func{SensorsSim\_UpdatePitot}) sigue esa misma cadena:
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=0.55cm and 0.7cm,
+  bloque/.style={draw, rounded corners=2pt, align=center, minimum height=1.0cm,
+                 font=\small, inner sep=4pt},
+  suma/.style={draw, circle, inner sep=1pt, font=\small},
+  flecha/.style={-{Latex[length=2mm]}}]
+  \node[bloque] (estado) {Estado\\$u,v,w$};
+  \node[bloque, right=of estado] (V) {$V=\sqrt{u^2+v^2+w^2}$};
+  \node[bloque, right=of V] (q) {$\tfrac12\rho(h)V^2$};
+  \node[suma, right=of q] (s) {$+$};
+  \node[bloque, right=of s] (conv) {IAS\\TAS};
+  \node[bloque, above=of q] (isa) {ISA $\rho(h)$};
+  \node[above=0.5cm of s, font=\small] (ruido) {$b + \nu$};
+  \draw[flecha] (estado) -- (V);
+  \draw[flecha] (V) -- (q);
+  \draw[flecha] (q) -- (s);
+  \draw[flecha] (s) -- node[above, font=\small]{$\dpm$} (conv);
+  \draw[flecha] (isa) -- (q);
+  \draw[flecha] (ruido) -- (s);
+\end{tikzpicture}
+\end{center}
+
+\subsection{Velocidad verdadera respecto al aire}
+
+Sin viento, la velocidad respecto al aire es la del avión. Con el estado total
+\eqref{eq:estado-total}:
+\begin{equation}
+  V = \sqrt{u^2 + v^2 + w^2}.
+  \label{eq:V}
+\end{equation}
+
+\paragraph{Cambio respecto al modelo anterior.} Antes se usaba la forma
+linealizada $V \approx V_0 + \Delta u + w_0\,\Delta w/u_0$ \cite{morelli}.
+La linealización correcta de \eqref{eq:V} alrededor del trim es
+$\Delta V = (u_0\,\Delta u + w_0\,\Delta w)/V_0$, así que la expresión
+anterior tenía $u_0$ donde va $V_0$ (error relativo $1 - \cos\alpha_0 \approx
+0.5\%$ en el término) e ignoraba $\Delta v$. Como los sensores ya trabajan
+con el estado total, la forma no lineal \eqref{eq:V} es exacta y no cuesta
+más.
+
+\paragraph{Consecuencia para la regresión.} Como $V$ incluye $v$, las columnas
+del pitot (\clave{pitot\_ms}, \clave{tas\_ms}, \clave{dp\_pa}) ya no son
+puramente longitudinales: una maniobra lateral las cambia (en el séptimo
+decimal en la rutina \texttt{ROUTINE\_LAT\_DIR}, porque $V$ depende de $v^2$).
+La comparación cruzada entre rutinas del README ya no las incluye.
+
+\subsection{Presión de impacto: hipótesis incompresible}
+
+Por Bernoulli incompresible la presión diferencial es la presión dinámica:
+\begin{equation}
+  \dpm_{\text{verd}} = \bar q = \tfrac12\,\rho(h)\,V^2 .
+  \label{eq:qbar}
+\end{equation}
+La expresión compresible (Saint-Venant, flujo subsónico)~\cite{anderson} es
+\begin{equation}
+  q_c = p_s\left[\left(1 + \frac{\gamma-1}{2}M^2\right)^{\frac{\gamma}{\gamma-1}} - 1\right]
+      = \bar q\left(1 + \frac{M^2}{4} + \frac{M^4}{40} + \cdots\right).
+\end{equation}
+En la condición de referencia $M = 0.0751$, así que $q_c/\bar q - 1 = M^2/4 =
+0.14\%$ ($\bar q = \SI{354.37}{Pa}$ frente a $q_c = \SI{354.87}{Pa}$), muy por
+debajo del ruido del sensor. Se usa \eqref{eq:qbar}.
+
+\subsection{Modelo del sensor}
+
+El ruido y el sesgo se suman en la \textbf{presión}, que es lo que mide el
+transductor, como en el modelo de pitot de Beard y McLain~\cite{beard}:
+\begin{equation}
+  \dpm = \tfrac12\,\rho(h)\,V^2 + b_{\Delta p} + \nu_{\Delta p},
+  \qquad \nu_{\Delta p} \sim \Normal(0, \sigma_{\Delta p}^2).
+  \label{eq:dp}
+\end{equation}
+Antes el ruido se sumaba directamente a la velocidad, con lo que su efecto era
+el mismo a cualquier velocidad. En un pitot real el error en velocidad crece
+cuando la velocidad baja (sección~\ref{sec:prop}).
+
+\subsection{Velocidad indicada y verdadera}
+
+El autopiloto no conoce $\rho$ a priori. La \textbf{velocidad indicada} (IAS)
+es la que da la presión con la densidad a nivel del mar:
+\begin{equation}
+  \text{IAS} = \sqrt{\frac{2\,\max(\dpm,\,0)}{\rhoo}} .
+  \label{eq:ias}
+\end{equation}
+Aquí IAS $=$ CAS $=$ EAS: no se modelan errores de posición ni de instrumento,
+y a $M < 0.1$ la corrección de compresibilidad entre CAS y EAS es despreciable.
+La \textbf{velocidad verdadera} (TAS) corrige por densidad:
+\begin{equation}
+  \text{TAS} = \text{IAS}\,\sqrt{\frac{\rhoo}{\rho(h)}} .
+  \label{eq:tas}
+\end{equation}
+Sin ruido, \eqref{eq:dp}--\eqref{eq:tas} devuelven TAS $= V$ exactamente.
+En el código se usa la $\rho(h)$ de la altitud verdadera, es decir, el
+autopiloto simulado conoce la densidad sin error. En un avión real saldría de
+la presión estática y de la temperatura medidas; ver
+sección~\ref{sec:limitaciones}.
+
+Si el ruido hace $\dpm < 0$ (solo posible a muy baja velocidad), la IAS y la
+TAS valen 0; la salida \clave{diff\_pressure\_pa} conserva el valor negativo
+tal como lo entregaría el transductor.
+
+\subsection{Propagación del ruido a la velocidad}
+\label{sec:prop}
+
+A primer orden, de $V = \sqrt{2\dpm/\rho}$:
+\begin{equation}
+  \sigma_V \approx \frac{\partial V}{\partial \dpm}\,\sigma_{\Delta p}
+           = \frac{\sigma_{\Delta p}}{\rho\,V},
+  \qquad
+  \sigma_{\text{IAS}} \approx \frac{\sigma_{\Delta p}}{\rhoo\,\text{IAS}} .
+  \label{eq:sigmaV}
+\end{equation}
+A segundo orden, la raíz cuadrada introduce un sesgo pequeño en la media:
+con $\varepsilon = \nu/\bar q$, $\sqrt{1+\varepsilon} \approx 1 +
+\varepsilon/2 - \varepsilon^2/8$, de donde
+\begin{equation}
+  \E[\widehat V] - V \approx -\frac{\sigma_V^2}{2V}.
+\end{equation}
+
+\paragraph{Elección de $\sigma_{\Delta p}$.} Se eligió que en el trim el ruido
+en TAS sea el mismo que tenía el modelo anterior, \SI{0.2}{m/s}:
+\begin{equation}
+  \sigma_{\Delta p} = \rho(\SI{1000}{m})\,V_0 \cdot \SI{0.2}{m/s}
+  = 1.1116 \times 25.25 \times 0.2 = \SI{5.61}{Pa}
+  \;\rightarrow\; \SI{5.6}{Pa}.
+\end{equation}
+Es del orden de la resolución de los sensores diferenciales usados en
+aeromodelos (MS4525DO, MPXV7002DP) y queda como parámetro a validar con datos
+reales del sensor (\clave{pitot\_dp\_noise\_std\_pa}). Con este valor
+($\rho = \SI{1.1116}{kg/m^3}$):
+
+\begin{center}
+\begin{tabular}{rrrrrr}
+\toprule
+$V$ [\si{m/s}] & $\bar q$ [\si{Pa}] & $\sigma_V$ [\si{m/s}] &
+$\sigma_{\text{IAS}}$ [\si{m/s}] & sesgo [\si{m/s}] & $P(\dpm<0)$ \\
+\midrule
+5     & 13.9  & 1.008 & 0.960 & $-0.10$   & $6.5\times10^{-3}$ \\
+10    & 55.6  & 0.504 & 0.480 & $-0.013$  & $\approx 0$ \\
+15    & 125.1 & 0.336 & 0.320 & $-0.004$  & 0 \\
+20    & 222.3 & 0.252 & 0.240 & $-0.002$  & 0 \\
+25.25 & 354.4 & 0.200 & 0.190 & $-0.0008$ & 0 \\
+30    & 500.2 & 0.168 & 0.160 & $-0.0005$ & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+El ruido en velocidad es inversamente proporcional a $V$: a \SI{5}{m/s} ya es
+de \SI{1}{m/s}. Es el comportamiento que se observa en vuelo real y el motivo
+para modelar el ruido en la presión.
+
+\subsection{Salidas y columnas del CSV}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Campo en \texttt{SensorPitotData} & Columna CSV & Unidad & Ecuación \\
+\midrule
+\clave{diff\_pressure\_pa} & \clave{dp\_pa}     & \si{Pa}  & \eqref{eq:dp} \\
+\clave{ias\_ms}            & \clave{pitot\_ms}  & \si{m/s} & \eqref{eq:ias} \\
+\clave{tas\_ms}            & \clave{tas\_ms}    & \si{m/s} & \eqref{eq:tas} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Ojo:} la columna \clave{pitot\_ms} ahora es la IAS (lo que de verdad
+entrega el sensor), $\approx 5\%$ menor que la TAS a \SI{1000}{m}. Para
+comparar con el estado del avión hay que usar \clave{tas\_ms}; flightreview
+ya lo hace en el derrape estimado.
+
+% ============================================================
+\section{Veleta de ángulo de ataque y derrape}
+\label{sec:veleta}
+% ============================================================
+
+\subsection{Ángulos verdaderos}
+
+En \func{SensorSim\_UpdateVanes}, del estado total \eqref{eq:estado-total}
+\cite{morelli}:
+\begin{align}
+  \alpha &= \atantwo(w,\,u), \\
+  \beta  &= \atantwo\!\left(v,\,\sqrt{u^2+w^2}\right) = \arcsin\frac{v}{V}.
+\end{align}
+La segunda forma muestra que $\beta$ está bien definida para cualquier $v$; se
+usa $\atantwo$ por robustez numérica. Si $|u| < \SI{0.1}{m/s}$ la medición se
+marca como inválida (la veleta no tiene sentido sin flujo).
+
+\subsection{Modelo del sensor}
+
+Mismo esquema aditivo \eqref{eq:medicion}, con el ruido en los ángulos que
+mide la veleta~\cite{beard}:
+\begin{align}
+  \alpha_m &= \alpha + b_\alpha + \nu_\alpha, \\
+  \beta_m  &= \beta  + b_\beta  + \nu_\beta,
+  \qquad \nu_\alpha, \nu_\beta \sim \Normal(0, \sigma_v^2)\ \text{independientes},
+\end{align}
+con $\sigma_v = \SI{0.5}{\degree}$ (\clave{vane\_noise\_std\_deg}) para ambos
+ángulos y sesgos $b_\alpha$, $b_\beta$ configurables por separado
+(\clave{vane\_alpha\_bias\_deg}, \clave{vane\_beta\_bias\_deg}), hoy en 0.
+$\nu_\alpha$ y $\nu_\beta$ son dos muestras consecutivas de la secuencia
+\texttt{SENSORS\_RNG\_VANE}, por lo que son independientes entre sí.
+
+\paragraph{Elección de $\sigma_v$.} \SI{0.5}{\degree} representa la suma de la
+resolución del potenciómetro o encóder de la veleta y de la turbulencia local
+del flujo en la sonda; es un valor típico de veletas de aeromodelo y, como el
+del pitot, queda pendiente de validar con datos de vuelo. Para comparación, el
+derrape del modo de \emph{dutch roll} en la rutina lateral es de unos pocos
+grados, así que el ruido no lo oculta.
+
+\paragraph{Antes:} ni $\alpha$ ni $\beta$ tenían ruido (TODO 8.7). No se
+había agregado porque, con un solo LCG compartido, una llamada más al
+generador cambiaba la línea base de todos los sensores; la
+sección~\ref{sec:ruido} resolvió eso.
+
+% ============================================================
+\section{Resumen de parámetros}
+% ============================================================
+
+Configurados en \archivo{src/main.c} (estructura \texttt{SensorsSimNoiseConfig}):
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Sensor & Clave & Valor & Unidad \\
+\midrule
+Pitot  & \clave{pitot\_dp\_noise\_std\_pa} & 5.6   & \si{Pa} \\
+       & \clave{pitot\_dp\_bias\_pa}       & 0     & \si{Pa} \\
+Veleta & \clave{vane\_noise\_std\_deg}     & 0.5   & \si{\degree} \\
+       & \clave{vane\_alpha\_bias\_deg}    & 0     & \si{\degree} \\
+       & \clave{vane\_beta\_bias\_deg}     & 0     & \si{\degree} \\
+\midrule
+\multicolumn{4}{l}{\emph{Otros sensores (mismo modelo \eqref{eq:medicion}, no
+detallados aquí)}} \\
+Giróscopos     & \clave{gyro\_noise\_std\_radps}  & 0.002 & \si{rad/s} \\
+Acelerómetros  & \clave{accel\_noise\_std\_mps2}  & 0.05  & \si{m/s^2} \\
+GPS posición   & \clave{gps\_pos\_noise\_std\_m}  & 1.5   & \si{m} \\
+GPS velocidad  & \clave{gps\_vel\_noise\_std\_ms} & 0.10  & \si{m/s} \\
+GPS altitud    & \clave{gps\_alt\_noise\_std\_m}  & 2.0   & \si{m} \\
+Láser          & \clave{laser\_noise\_std\_m}     & 0.03  & \si{m} \\
+\midrule
+Global         & \clave{random\_seed}             & 1234  & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Con \clave{enable\_noise = false} todas las salidas son las magnitudes
+verdaderas más el sesgo.
+
+% ============================================================
+\section{Verificación}
+% ============================================================
+
+\paragraph{Pruebas unitarias} (\texttt{ctest}):
+\begin{itemize}
+  \item \archivo{test/test\_atmosphere.c}: tabla ISA, monotonía y saturación.
+  \item \archivo{test/test\_sensors.c}:
+  \begin{itemize}
+    \item T1: sin ruido, $\dpm = \tfrac12\rho V^2$, TAS $=V$ e
+          IAS $= V\sqrt{\rho/\rhoo}$ (tolerancia $10^{-9}$).
+    \item T2: a la misma TAS, más altitud da menos $\dpm$ e IAS.
+    \item T3: con ruido, $\hat\sigma_{\Delta p}$ y $\hat\sigma_{\text{TAS}}$
+          coinciden con \SI{5.6}{Pa} y \eqref{eq:sigmaV} dentro de 5\%
+          (20\,000 muestras).
+    \item T4: veleta en trim ($\alpha = \alpha_0$, $\beta = 0$);
+          $\hat\sigma_\alpha$ y $\hat\sigma_\beta$ dentro de 5\% de
+          \SI{0.5}{\degree} y $|r_{\alpha\beta}| < 0.05$.
+  \end{itemize}
+\end{itemize}
+
+\paragraph{Simulación completa.} En el primer segundo de la corrida de
+referencia el avión está en trim (estado nulo), así que las salidas son valor
+verdadero más ruido (1000 muestras):
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Salida & Esperado & Media simulada & $\hat\sigma$ simulada \\
+\midrule
+$\dpm$ [\si{Pa}]          & 354.37 & 354.11 & 5.66 \\
+IAS [\si{m/s}]            & 24.05  & 24.04  & 0.192 \\
+TAS [\si{m/s}]            & 25.25  & 25.24  & 0.202 \\
+$\alpha$ [\si{\degree}]   & 5.92   & 5.90   & 0.506 \\
+$\beta$ [\si{\degree}]    & 0      & 0.03   & 0.517 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Las diferencias de la media son menores que dos veces el error estándar
+$\hat\sigma/\sqrt{1000}$.
+
+% ============================================================
+\section{Limitaciones y trabajo futuro}
+\label{sec:limitaciones}
+% ============================================================
+
+\begin{itemize}
+  \item \textbf{Sin viento ni ráfagas}: la velocidad respecto al aire es la
+        inercial. Con viento, \eqref{eq:V} y los ángulos de la veleta deben
+        usar $\bm V - \bm V_{\text{viento}}$.
+  \item \textbf{Densidad conocida}: la TAS usa $\rho$ de la altitud verdadera.
+        Un modelo más fiel tendría barómetro y sensor de temperatura con su
+        propio ruido, y la TAS heredaría ese error.
+  \item \textbf{Sin errores de posición}: ni del puerto estático ni de la veleta
+        (\emph{upwash}, factor $k_\alpha$), ni el ángulo inducido por rotación
+        ($q\,x_v/V$ si la veleta está a una distancia $x_v$ del CG).
+  \item \textbf{Sin dinámica}: no hay retardo de las líneas neumáticas del pitot
+        ni dinámica de segundo orden de la veleta.
+  \item \textbf{Sin cuantización} del ADC ni deriva del sesgo (paseo aleatorio).
+  \item \textbf{Valores de $\sigma$ por validar} con datos del sensor real
+        (\clave{pitot\_dp\_noise\_std\_pa}, \clave{vane\_noise\_std\_deg}).
+  \item Los modelos de la IMU, el GPS y el láser usan el mismo esquema
+        \eqref{eq:medicion}; su teoría (fuerza específica, conversión
+        cuerpo--NED) queda para otra sección.
+\end{itemize}
+
+% ============================================================
+\begin{thebibliography}{9}
+% ============================================================
+\bibitem{morelli}
+E.~A. Morelli y V.~Klein, \emph{Aircraft System Identification: Theory and
+Practice}, 2.ª ed. Sunflyte Enterprises, 2016.
+
+\bibitem{anderson}
+J.~D. Anderson, \emph{Introduction to Flight}, 8.ª ed. McGraw-Hill, 2016,
+cap.~3 (medición de velocidad).
+
+\bibitem{beard}
+R.~W. Beard y T.~W. McLain, \emph{Small Unmanned Aircraft: Theory and
+Practice}. Princeton University Press, 2012, cap.~7 (modelos de sensores).
+
+\bibitem{iso2533}
+ISO 2533:1975, \emph{Standard Atmosphere}. International Organization for
+Standardization.
+
+\bibitem{press}
+W.~H. Press \emph{et al.}, \emph{Numerical Recipes in C}, 2.ª ed. Cambridge
+University Press, 1992, sec.~7.1.
+\end{thebibliography}
+
+\end{document}

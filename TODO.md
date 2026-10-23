@@ -53,21 +53,11 @@
 
 ## SECTION 4: Sensor Integration
 
-### 4.1 Fix pitot model (altitude/TAS/IAS)
-- **Task:** Correct pitot tube model in `SensorsSim_UpdatePitot` (`src/sensors_sim.c`)
-  - Bug: Fixed sea-level density vs. altitude (should vary with altitude;
-    hoy `rho0 = 1.225` fijo)
-  - Bug: TAS/IAS convention mixing
-  - Bug: Noise model applied to velocity instead of pressure
-- **Files:** `src/sensors_sim.c`, `src/sensors_sim.h`
-- **Note:** cambia la línea base de regresión (agrupar con 8.7)
-- **Reference:** Standard atmosphere model (density decay)
-- **Acceptance:** 
-  - Density decreases with altitude (verify at 1000m vs. 5000m)
-  - IAS computed correctly from TAS
-  - Noise injected on pressure, not velocity
-- **Priority:** HIGH (affects simulation fidelity)
-- **Estimate:** 2h
+### 4.1 Fix pitot model (altitude/TAS/IAS) ✅
+- **Hecho (2026-10-22):** V no lineal √(u²+v²+w²), ρ ISA en C
+  (`src/atmosphere.c`), ruido y bias en Δp [Pa] (σ = 5.6 Pa), salidas IAS y
+  TAS (columnas `pitot_ms` = IAS, `tas_ms`, `dp_pa`). Tests `test_atmosphere`
+  y `test_sensors`. Teoría en `docs/teoria/sensores/ruido_sensores.tex`.
 
 ---
 
@@ -152,10 +142,10 @@
 ### 8.6 theta de sensores vs theta0 del modelo lateral ✅
 - **Hecho (2026-10-21):** sensores con `θ = θ0 + dθ` y `w = w0 + dw`.
 
-### 8.7 Ruido en la veleta de beta
-- **Task:** Agregar ruido a `SideSlipAngle_deg` en un solo commit que regenere la
-  línea base (una llamada nueva a `sensors_noise()` desplaza el LCG).
-- **Priority:** LOW
+### 8.7 Ruido en la veleta de beta ✅
+- **Hecho (2026-10-22):** ruido de 0.5° y bias configurable en α y β. Cada
+  sensor tiene ahora su propia secuencia de LCG, así que agregar ruido ya no
+  desplaza los demás sensores.
 
 ### 8.8 Migrar longitudinal a rk4_step_n
 - **Task:** Usar `rk4_step_n` también en el longitudinal y eliminar `rk4_step`

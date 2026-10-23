@@ -1,4 +1,5 @@
 #include "sensors_sim.h"
+#include "atmosphere.h"
 
 #include <string.h>
 #include <math.h>
@@ -62,13 +63,27 @@ static double sensors_rand_normal(uint32_t *state, double std)
     return (sum - 6.0) * std;
 }
 
-static double sensors_noise(SensorsSim *ss, double std)
+static double sensors_noise(SensorsSim *ss, SensorsRng_e rng, double std)
 {
     if (!ss->cfg.noise.enable_noise) {
         return 0.0;
     }
 
-    return sensors_rand_normal(&ss->rng_state, std);
+    return sensors_rand_normal(&ss->rng_state[rng], std);
+}
+
+/* Semilla de la secuencia k a partir de la semilla global: mezcla tipo
+ * splitmix32 de seed + k*0x9E3779B9, para que las secuencias de LCG de los
+ * sensores no sean la misma desplazada unos pocos pasos. Nunca devuelve 0. */
+static uint32_t sensors_seed_stream(uint32_t seed, uint32_t k)
+{
+    uint32_t z = seed + (k + 1u) * 0x9E3779B9u;
+
+    z = (z ^ (z >> 16)) * 0x85EBCA6Bu;
+    z = (z ^ (z >> 13)) * 0xC2B2AE35u;
+    z =  z ^ (z >> 16);
+
+    return (z == 0u) ? 1u : z;
 }
 
 /* ============================================================
@@ -175,6 +190,62 @@ static double sensors_get_phi_rad(const FlightSim *sim)
     return sim->X_lat[3];
 }
 
+static void sensors_get_v_ned_ms(const FlightSim *sim,
+                                 double *vn, double *ve, double *vd)
+{
+    double u = sensors_get_u_body_ms(sim);
+    double w = sensors_get_w_body_ms(sim);
+    double theta = sensors_get_theta_rad(sim);
+
+    /*
+     * Conversión cuerpo -> NED simplificada longitudinal.
+     *
+     * Asumimos:
+     * - no hay velocidad lateral
+     * - no hay heading todavía
+     * - todo se mueve sobre el eje Norte
+     *
+     * ve = 0 mientras no exista dpsi como estado (el modelo lateral
+     * tiene solo [dv, dp, dr, dphi]).
+     *
+     * V_N = u cos(theta) + w sin(theta)
+     * V_D = -u sin(theta) + w cos(theta)
+     */
+    *vn = u * cos(theta) + w * sin(theta);
+    *ve = 0.0;
+    *vd = -u * sin(theta) + w * cos(theta);
+}
+
+/* ============================================================
+ * Posición verdadera (navegación)
+ * ============================================================ */
+
+/* Integra lat, lon y altitud verdaderas. Va antes de los sensores: la
+ * altitud alimenta la ISA del pitot, el GPS y el láser. */
+static void SensorsSim_PropagateNav(SensorsSim *ss,
+                                    const FlightSim *sim,
+                                    double dt_s)
+{
+    if (dt_s <= 0.0) return;
+
+    double vn, ve, vd;
+    sensors_get_v_ned_ms(sim, &vn, &ve, &vd);
+
+    double d_north = vn * dt_s;
+    double d_east  = ve * dt_s;
+    double d_down  = vd * dt_s;
+
+    double cos_lat = cos(ss->lat_rad);
+
+    if (fabs(cos_lat) < 1.0e-6) {
+        cos_lat = 1.0e-6;
+    }
+
+    ss->lat_rad += d_north / SENSORS_SIM_EARTH_RADIUS_M;
+    ss->lon_rad += d_east / (SENSORS_SIM_EARTH_RADIUS_M * cos_lat);
+    ss->alt_m   -= d_down;
+}
+
 /* ============================================================
  * Modelos de sensores
  * ============================================================ */
@@ -183,45 +254,46 @@ static void SensorsSim_UpdatePitot(SensorsSim *ss,
                                    const FlightSim *sim)
 {
     /*
-     * Tu estado X[0] = du.
-     * La velocidad total Viento:
+     * Tubo pitot-estático con sensor de presión diferencial.
+     * Teoría: docs/teoria/sensores/ruido_sensores.tex
      *
-     * V = V0 + dV
-     *                     dw
-     * dV = du + w0_ms * ------
-     *                    u0_ms
+     * Velocidad verdadera respecto al aire (sin viento), no lineal:
      *
-     * Aircraft systems identification Morelli Pag.81
+     *   V = sqrt(u^2 + v^2 + w^2),  u = u0 + du, v = dv, w = w0 + dw
+     *
+     * Presión de impacto incompresible (M ~ 0.07: error < 0.2 %):
+     *
+     *   Δp = 1/2 rho(h) V^2 + bias + ruido      rho(h): ISA
+     *
+     * El ruido entra en la presión, no en la velocidad. Salidas:
+     *
+     *   IAS = sqrt(2 Δp / rho0)      TAS = IAS sqrt(rho0 / rho(h))
+     *
+     * Δp < 0 por ruido a baja velocidad -> IAS = TAS = 0.
      */
     if (!ss->cfg.pitot_enabled) {
         ss->data.pitot.valid = false;
         return;
     }
 
-    const double V0 = (double)sim->params.V0_ms;
+    const double u = sensors_get_u_body_ms(sim);
+    const double v = sensors_get_v_body_ms(sim);
+    const double w = sensors_get_w_body_ms(sim);
 
-    const double u0 = (double)sim->params.u0_ms;
+    const double V_true = sqrt(u * u + v * v + w * w);
+    const double rho    = Atmosphere_IsaDensity(ss->alt_m);
 
-    const double w0 = (double)sim->params.w0_ms;
+    double dp = 0.5 * rho * V_true * V_true;
 
-    double du = sim->X_lon[0];
+    dp += ss->cfg.noise.pitot_dp_bias_pa;
+    dp += sensors_noise(ss, SENSORS_RNG_PITOT, ss->cfg.noise.pitot_dp_noise_std_pa);
 
-    double dw = sim->X_lon[1];
-
-    double dV = du + w0 * dw / u0;
-
-    const double rho0 = 1.225;
-
-    double v_air = V0 + dV ;
-
-    v_air += ss->cfg.noise.pitot_bias_ms;
-    v_air += sensors_noise(ss, ss->cfg.noise.pitot_noise_std_ms);
-
-    v_air = clamp_min(v_air, 0.0);
+    const double ias = sqrt(2.0 * clamp_min(dp, 0.0) / ISA_RHO0_KG_M3);
 
     ss->data.pitot.valid = true;
-    ss->data.pitot.airspeed_ms = v_air;
-    ss->data.pitot.dynamic_pressure_pa = 0.5 * rho0 * v_air * v_air;
+    ss->data.pitot.diff_pressure_pa = dp;
+    ss->data.pitot.ias_ms = ias;
+    ss->data.pitot.tas_ms = ias * sqrt(ISA_RHO0_KG_M3 / rho);
 }
 
 static void SensorSim_UpdateVanes(SensorsSim *ss,
@@ -246,8 +318,9 @@ static void SensorSim_UpdateVanes(SensorsSim *ss,
      *   beta   = tan   |-----------------|
      *                  |_ sqrt(u^2+w^2) _|
      *
-     * Sin ruido en beta por ahora: una llamada extra a sensors_noise()
-     * desplazaria toda la secuencia del LCG (rompe la linea base).
+     * Ruido blanco gaussiano y bias en grados, sobre alpha y beta
+     * (secuencia propia SENSORS_RNG_VANE).
+     * Teoría: docs/teoria/sensores/ruido_sensores.tex
      */
     const double u0 = (double)sim->params.u0_ms;
 
@@ -263,11 +336,20 @@ static void SensorSim_UpdateVanes(SensorsSim *ss,
     }
 
     double alpha_rad = atan2(w, u);
-    ss->data.vane.AngleOfAttack_deg = alpha_rad * 57.29577951308;  // rad to deg
-
     double v = sensors_get_v_body_ms(sim);
     double beta_rad = atan2(v, sqrt(u * u + w * w));
-    ss->data.vane.SideSlipAngle_deg = beta_rad * 57.29577951308;   // rad to deg
+
+    double alpha_deg = rad2deg(alpha_rad);
+    double beta_deg  = rad2deg(beta_rad);
+
+    alpha_deg += ss->cfg.noise.vane_alpha_bias_deg;
+    alpha_deg += sensors_noise(ss, SENSORS_RNG_VANE, ss->cfg.noise.vane_noise_std_deg);
+
+    beta_deg += ss->cfg.noise.vane_beta_bias_deg;
+    beta_deg += sensors_noise(ss, SENSORS_RNG_VANE, ss->cfg.noise.vane_noise_std_deg);
+
+    ss->data.vane.AngleOfAttack_deg = alpha_deg;
+    ss->data.vane.SideSlipAngle_deg = beta_deg;
     ss->data.vane.valid = true;
 }
 
@@ -327,17 +409,17 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
     gy += ss->cfg.noise.gyro_bias_y_radps;
     gz += ss->cfg.noise.gyro_bias_z_radps;
 
-    gx += sensors_noise(ss, ss->cfg.noise.gyro_noise_std_radps);
-    gy += sensors_noise(ss, ss->cfg.noise.gyro_noise_std_radps);
-    gz += sensors_noise(ss, ss->cfg.noise.gyro_noise_std_radps);
+    gx += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
+    gy += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
+    gz += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
 
     ax += ss->cfg.noise.accel_bias_x_mps2;
     ay += ss->cfg.noise.accel_bias_y_mps2;
     az += ss->cfg.noise.accel_bias_z_mps2;
 
-    ax += sensors_noise(ss, ss->cfg.noise.accel_noise_std_mps2);
-    ay += sensors_noise(ss, ss->cfg.noise.accel_noise_std_mps2);
-    az += sensors_noise(ss, ss->cfg.noise.accel_noise_std_mps2);
+    ax += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
+    ay += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
+    az += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
 
     ss->data.imu.valid = true;
 
@@ -353,56 +435,19 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
 }
 
 static void SensorsSim_UpdateGps(SensorsSim *ss,
-                                 const FlightSim *sim,
-                                 double dt_s)
+                                 const FlightSim *sim)
 {
     if (!ss->cfg.gps_enabled) {
         ss->data.gps.valid = false;
         return;
     }
 
-    double u = sensors_get_u_body_ms(sim);
-    double w = sensors_get_w_body_ms(sim);
-    double theta = sensors_get_theta_rad(sim);
+    double vn, ve, vd;
+    sensors_get_v_ned_ms(sim, &vn, &ve, &vd);
 
-    /*
-     * Conversión cuerpo -> NED simplificada longitudinal.
-     *
-     * Asumimos:
-     * - no hay velocidad lateral
-     * - no hay heading todavía
-     * - todo se mueve sobre el eje Norte
-     *
-     * ve = 0 mientras no exista dpsi como estado (el modelo lateral
-     * tiene solo [dv, dp, dr, dphi]).
-     *
-     * V_N = u cos(theta) + w sin(theta)
-     * V_D = -u sin(theta) + w cos(theta)
-     */
-    double vn = u * cos(theta) + w * sin(theta);
-    double ve = 0.0;
-    double vd = -u * sin(theta) + w * cos(theta);
-
-    /* Integración de posición */
-    if (dt_s > 0.0) {
-        double d_north = vn * dt_s;
-        double d_east  = ve * dt_s;
-        double d_down  = vd * dt_s;
-
-        double cos_lat = cos(ss->lat_rad);
-
-        if (fabs(cos_lat) < 1.0e-6) {
-            cos_lat = 1.0e-6;
-        }
-
-        ss->lat_rad += d_north / SENSORS_SIM_EARTH_RADIUS_M;
-        ss->lon_rad += d_east / (SENSORS_SIM_EARTH_RADIUS_M * cos_lat);
-        ss->alt_m   -= d_down;
-    }
-
-    double lat_m_noise = sensors_noise(ss, ss->cfg.noise.gps_pos_noise_std_m);
-    double lon_m_noise = sensors_noise(ss, ss->cfg.noise.gps_pos_noise_std_m);
-    double alt_noise   = sensors_noise(ss, ss->cfg.noise.gps_alt_noise_std_m);
+    double lat_m_noise = sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_pos_noise_std_m);
+    double lon_m_noise = sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_pos_noise_std_m);
+    double alt_noise   = sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_alt_noise_std_m);
 
     double lat_noise_rad = lat_m_noise / SENSORS_SIM_EARTH_RADIUS_M;
 
@@ -413,9 +458,9 @@ static void SensorsSim_UpdateGps(SensorsSim *ss,
 
     double lon_noise_rad = lon_m_noise / (SENSORS_SIM_EARTH_RADIUS_M * cos_lat2);
 
-    double vn_meas = vn + sensors_noise(ss, ss->cfg.noise.gps_vel_noise_std_ms);
-    double ve_meas = ve + sensors_noise(ss, ss->cfg.noise.gps_vel_noise_std_ms);
-    double vd_meas = vd + sensors_noise(ss, ss->cfg.noise.gps_vel_noise_std_ms);
+    double vn_meas = vn + sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_vel_noise_std_ms);
+    double ve_meas = ve + sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_vel_noise_std_ms);
+    double vd_meas = vd + sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_vel_noise_std_ms);
 
     ss->data.gps.valid = true;
 
@@ -440,7 +485,7 @@ static void SensorsSim_UpdateLaser(SensorsSim *ss)
     double range = ss->alt_m - ss->cfg.ground_alt_m;
 
     range += ss->cfg.noise.laser_bias_m;
-    range += sensors_noise(ss, ss->cfg.noise.laser_noise_std_m);
+    range += sensors_noise(ss, SENSORS_RNG_LASER, ss->cfg.noise.laser_noise_std_m);
 
     range = clamp_min(range, 0.0);
 
@@ -477,9 +522,8 @@ void SensorsSim_Init(SensorsSim *ss,
         ss->alt_m = sim->H_m;
     }
 
-    ss->rng_state = cfg->random_seed;
-    if (ss->rng_state == 0u) {
-        ss->rng_state = 1u;
+    for (uint32_t k = 0u; k < (uint32_t)SENSORS_RNG_N; ++k) {
+        ss->rng_state[k] = sensors_seed_stream(cfg->random_seed, k);
     }
 
     ss->prev_u_ms = sensors_get_u_body_ms(sim);
@@ -513,10 +557,12 @@ void SensorsSim_Update(SensorsSim *ss,
 
     ss->data.t_s = sim->t_s;
 
+    SensorsSim_PropagateNav(ss, sim, dt_s);
+
     SensorsSim_UpdatePitot(ss, sim);
     SensorSim_UpdateVanes(ss, sim);
     SensorsSim_UpdateImu(ss, sim, dt_s);
-    SensorsSim_UpdateGps(ss, sim, dt_s);
+    SensorsSim_UpdateGps(ss, sim);
     SensorsSim_UpdateLaser(ss);
 
     ss->prev_u_ms = u;

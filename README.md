@@ -43,6 +43,7 @@ SIL_Flight_Control/
 | `dynamics`             | Matrices A/B lon y lat, RK4 (4x1 y n/m), señales      |
 | `aircraft_loader`      | Carga parámetros y config de servos desde el JSON     |
 | `sensors_sim`          | Pitot, veleta (α, β), IMU, GPS y láser, ruido y bias  |
+| `atmosphere`           | Densidad ISA (troposfera), igual a `dynamics/`        |
 | `flight_management`    | Capa de control (**tipos definidos, sin implementar**)|
 | `sim_PWM_processing`   | Banco de canales PWM (compilado, aún sin usar)        |
 | `sim_settings.h`       | Selección de plataforma y tiempo de simulación        |
@@ -160,14 +161,26 @@ cmake --build build && ./build/SIL_Flight_Control > /dev/null
 
 # 3) Comparar
 python3 test/compare_csv_cols.py data/baseline_<commit_base>.csv data/SIL_sim_servos2.csv \
-    --cols t_s,du_mps,dw_mps,dq_radps,dtheta_rad,y_elev_deg,pitot_ms,AoA_deg,gyro_y_radps,acc_x_mps2,gps_alt_m,laser_alt_m
+    --cols t_s,du_mps,dw_mps,dq_radps,dtheta_rad,y_elev_deg,AoA_deg,gyro_y_radps,acc_x_mps2,gps_alt_m,laser_alt_m
 ```
 
 La línea base puede generarse con `ROUTINE_LONGITUDINAL` y la comparación
 correrse con `ROUTINE_LAT_DIR`: ambas rutinas tienen el mismo `pitch`, así que el
-estado longitudinal debe coincidir. La línea base vigente es `e041d25` (ejes
-cuerpo, trim del elevador −0.49° y servo de elevador con k = 0.04 deg/µs); las
-anteriores (`5ea17b6`, `4affdca`, `f1b6478`) ya no aplican.
+estado longitudinal debe coincidir. Las columnas del pitot (`pitot_ms`,
+`tas_ms`, `dp_pa`) **no** entran en esa comparación: V = √(u²+v²+w²) incluye el
+`v` lateral. Cada sensor tiene su propia secuencia de ruido, así que agregar o
+quitar ruido en uno no cambia las columnas de los demás.
+
+La línea base vigente es `2220e20` (pitot con Δp e ISA, ruido de veleta,
+secuencia de ruido por sensor); las anteriores (`e041d25`, `5ea17b6`, …) ya no
+aplican.
+
+## Documentación teórica (`docs/teoria/`)
+
+La teoría de los modelos va en LaTeX, un documento por tema (ver
+`docs/teoria/README.md`). Hoy: `docs/teoria/sensores/ruido_sensores.tex`
+(pitot, veleta, ISA y generador de ruido). Compilar con
+`cd docs/teoria/sensores && latexmk -pdf ruido_sensores.tex`.
 
 ## Derivadas de estabilidad (`dynamics/`)
 

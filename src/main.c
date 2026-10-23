@@ -105,8 +105,13 @@ void task_init_1ms(void)
 
     scfg.noise.enable_noise = true;
 
-    scfg.noise.pitot_noise_std_ms = 0.20;
-    scfg.noise.pitot_bias_ms      = 0.00;
+    /* sigma_dp = rho(1000 m) * V0 * 0.2 m/s: 0.2 m/s de TAS en el trim */
+    scfg.noise.pitot_dp_noise_std_pa = 5.6;
+    scfg.noise.pitot_dp_bias_pa      = 0.0;
+
+    scfg.noise.vane_noise_std_deg  = 0.5;
+    scfg.noise.vane_alpha_bias_deg = 0.0;
+    scfg.noise.vane_beta_bias_deg  = 0.0;
 
     scfg.noise.gyro_noise_std_radps = 0.002;
     scfg.noise.gyro_bias_x_radps    = 0.0;
@@ -169,7 +174,7 @@ void task_init_1ms(void)
                          "pilot_roll,pilot_pitch,pilot_yaw,pilot_throttle," // comandos originales
                          "mode,arm,"                                         // modos
                          "du_mps,dw_mps,dq_radps,dtheta_rad,"            // Estado longitudinal
-                        "pitot_ms,AoA_deg,SSA_deg,"                                         // arsp, AoA, SideSlip
+                        "pitot_ms,tas_ms,dp_pa,AoA_deg,SSA_deg,"                             // IAS, TAS, Δp, AoA, SideSlip
                         "gyro_x_radps,gyro_y_radps,gyro_z_radps,"           // giros
                         "acc_x_mps2,acc_y_mps2,acc_z_mps2,"                 // aceleraciones
                         "gps_lat_deg,gps_lon_deg,gps_alt_m,"                // GPS data
@@ -341,7 +346,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.3f,%.3f,%.3f,%.3f,"   // pilot_roll, pilot_pitch, pilot_yaw, pilot_throttle
                     "%.0f,%.0f,"             // mode, arm
                     "%.6f,%.6f,%.6f,%.6f,"  // du, dw, dq, dtheta
-                    "%.6f,%.6f,%.6f,"       // ARSP, AoA, SideSlip
+                    "%.6f,%.6f,%.6f,%.6f,%.6f,"  // IAS, TAS, Δp, AoA, SideSlip
                     "%.3f,%.3f,%.3f,"       // giros
                     "%.3f,%.3f,%.3f,"       // acelerometros
                     "%.3f,%.3f,%.3f,"       // gps data
@@ -365,7 +370,9 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     (double)pilot.mode_switch, (double)pilot.arm_switch,    // modos
                     (double)du,(double)dw,(double)dq,(double)dtheta ,      // du, dw, dq, dtheta
 
-                    (double)g_sens_data.pitot.airspeed_ms,                  // ARSP
+                    (double)g_sens_data.pitot.ias_ms,                       // IAS
+                    (double)g_sens_data.pitot.tas_ms,                       // TAS
+                    (double)g_sens_data.pitot.diff_pressure_pa,             // Δp
                     (double)g_sens_data.vane.AngleOfAttack_deg,
                     (double)g_sens_data.vane.SideSlipAngle_deg,
 

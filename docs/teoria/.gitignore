@@ -1,0 +1,15 @@
+# Solo se trackean las fuentes .tex (y figuras fuente); el PDF se compila.
+*.pdf
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.nav
+*.snm

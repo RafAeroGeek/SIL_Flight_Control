@@ -21,7 +21,7 @@ REAL_COLUMNS = [
     "pilot_roll", "pilot_pitch", "pilot_yaw", "pilot_throttle",
     "mode", "arm",
     "du_mps", "dw_mps", "dq_radps", "dtheta_rad",
-    "pitot_ms", "AoA_deg", "SSA_deg",
+    "pitot_ms", "tas_ms", "dp_pa", "AoA_deg", "SSA_deg",
     "gyro_x_radps", "gyro_y_radps", "gyro_z_radps",
     "acc_x_mps2", "acc_y_mps2", "acc_z_mps2",
     "gps_lat_deg", "gps_lon_deg", "gps_alt_m",

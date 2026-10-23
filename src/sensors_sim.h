@@ -26,6 +26,18 @@ extern "C" {
  * Tipos auxiliares
  * ============================================================ */
 
+/* Una secuencia pseudoaleatoria por sensor: agregar o quitar ruido en uno
+ * no desplaza la secuencia de los demás. */
+typedef enum
+{
+    SENSORS_RNG_PITOT = 0,
+    SENSORS_RNG_VANE,
+    SENSORS_RNG_IMU,
+    SENSORS_RNG_GPS,
+    SENSORS_RNG_LASER,
+    SENSORS_RNG_N
+} SensorsRng_e;
+
 typedef struct
 {
     double x;
@@ -41,9 +53,14 @@ typedef struct
 {
     bool   enable_noise;
 
-    /* Pitot */
-    double pitot_noise_std_ms;
-    double pitot_bias_ms;
+    /* Pitot: ruido y bias del sensor de presión diferencial */
+    double pitot_dp_noise_std_pa;
+    double pitot_dp_bias_pa;
+
+    /* Veleta: misma sigma para alpha y beta, bias por ángulo */
+    double vane_noise_std_deg;
+    double vane_alpha_bias_deg;
+    double vane_beta_bias_deg;
 
     /* Gyros */
     double gyro_noise_std_radps;
@@ -104,8 +121,9 @@ typedef struct
 {
     bool valid;
 
-    double airspeed_ms;
-    double dynamic_pressure_pa;
+    double diff_pressure_pa;   // Δp medida (con ruido y bias) [Pa]
+    double ias_ms;             // IAS = sqrt(2 Δp / rho0) [m/s]
+    double tas_ms;             // TAS = IAS sqrt(rho0 / rho(h)) [m/s]
 
 } SensorPitotData;
 
@@ -189,8 +207,8 @@ typedef struct
     double prev_v_ms;
     bool   prev_valid;
 
-    /* Generador pseudoaleatorio */
-    uint32_t rng_state;
+    /* Generador pseudoaleatorio: un estado por sensor (SensorsRng_e) */
+    uint32_t rng_state[SENSORS_RNG_N];
 
 } SensorsSim;
 

@@ -209,7 +209,7 @@ def _vane(tmp_path, df):
 
 
 def test_vane_superpone_beta_est_dashed(tmp_path, synthetic_df):
-    synthetic_df["pitot_ms"] = 25.0
+    synthetic_df["tas_ms"] = 25.0
     fig, source = _vane(tmp_path, synthetic_df)
     lineas = _lines(fig)
     assert len(lineas) == 3  # AoA + SSA + beta_est
@@ -219,8 +219,23 @@ def test_vane_superpone_beta_est_dashed(tmp_path, synthetic_df):
     np.testing.assert_allclose(source.data["vane_beta_est_deg"], esperado, atol=1e-4)
 
 
+def test_vane_beta_est_usa_tas_y_no_ias(tmp_path, synthetic_df):
+    synthetic_df["pitot_ms"] = 24.0   # IAS
+    synthetic_df["tas_ms"] = 25.25
+    _, source = _vane(tmp_path, synthetic_df)
+    esperado = np.degrees(np.arctan2(synthetic_df["dv_mps"], 25.25))
+    np.testing.assert_allclose(source.data["vane_beta_est_deg"], esperado, atol=1e-4)
+
+
+def test_vane_beta_est_con_log_viejo_usa_pitot(tmp_path, synthetic_df):
+    synthetic_df["pitot_ms"] = 25.0
+    _, source = _vane(tmp_path, synthetic_df.drop(columns=["tas_ms", "dp_pa"]))
+    esperado = np.degrees(np.arctan2(synthetic_df["dv_mps"], 25.0))
+    np.testing.assert_allclose(source.data["vane_beta_est_deg"], esperado, atol=1e-4)
+
+
 def test_vane_beta_est_nan_con_velocidad_nula(tmp_path, synthetic_df):
-    # pitot_ms = 0 en el fixture: sin velocidad no hay derrape estimado.
+    # tas_ms = 0 en el fixture: sin velocidad no hay derrape estimado.
     _, source = _vane(tmp_path, synthetic_df)
     assert np.isnan(source.data["vane_beta_est_deg"]).all()
 

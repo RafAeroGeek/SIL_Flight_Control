@@ -1,0 +1,64 @@
+% ============================================================
+% preambulo.tex — preámbulo común de la documentación teórica
+% de SIL_Flight_Control (docs/teoria/).
+%
+% Uso, desde un documento en docs/teoria/<tema>/:
+%   \documentclass[11pt,a4paper]{article}
+%   \input{../comun/preambulo}
+% ============================================================
+
+% ---------- Idioma y codificación ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+% es-noshorthands: no redefine < > " (rompen TikZ y siunitx)
+% es-nodecimaldot: el punto decimal se queda como punto, igual que en el código
+\usepackage[spanish,es-noshorthands,es-nodecimaldot,es-tabla]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ---------- Página ----------
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{parskip}
+
+% ---------- Matemáticas y unidades ----------
+\usepackage{amsmath,amssymb}
+\usepackage{bm}
+\usepackage[output-decimal-marker={.},per-mode=symbol]{siunitx}
+
+% ---------- Tablas, figuras, código ----------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  framerule=0.3pt,
+  breaklines=true,
+  inputencoding=utf8,
+  extendedchars=true,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {ñ}{{\~n}}1 {Δ}{{$\Delta$}}1 {°}{{$^\circ$}}1,
+}
+
+% ---------- Referencias cruzadas ----------
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=green!40!black,
+            urlcolor=blue!60!black]{hyperref}
+
+% ---------- Macros del proyecto ----------
+% Nombres de código: archivos, funciones, claves de configuración y columnas
+\newcommand{\archivo}[1]{\texttt{#1}}
+\newcommand{\func}[1]{\texttt{#1}}
+\newcommand{\clave}[1]{\texttt{#1}}
+\newcommand{\proyecto}{\textsf{SIL\_Flight\_Control}}
+
+% Notación
+\newcommand{\dpm}{\Delta p}            % presión diferencial medida
+\newcommand{\rhoo}{\rho_0}             % densidad a nivel del mar ISA
+\newcommand{\Normal}{\mathcal{N}}      % distribución normal
+\newcommand{\E}{\mathbb{E}}            % esperanza
+\DeclareMathOperator{\atantwo}{atan2}
