@@ -19,6 +19,7 @@ girados α = atan2(w0, u0) (α_trim) alrededor de y. Con T = [[c, −s], [s, c]]
       A_b = P·A_s·P⁻¹    B_b = P·B_s
     Sale A_b[0][2] = −w0, A_b[1][2] = u0, X_θ = −g cos θ0, Z_θ = −g sin θ0
     y X_δe = −s·Z_δe (el C los arma con w0_ms, u0_ms y X_de).
+    δe_trim no depende de los ejes: pasa tal cual a delta_e_trim_deg.
 
   Lateral: con I_x, I_z de ejes cuerpo (estimadas) e I_xz = 0, se giran los
   momentos 𝓛 = I_x·L, 𝓝 = I_z·N:
@@ -92,6 +93,8 @@ def mapear_longitudinal(lon: dict) -> dict:
         "w0_ms"     : w0,
         "gamma0_deg": cv["gamma0_deg"],
         "theta0_deg": math.degrees(a) + cv["gamma0_deg"],
+        # Deflexión absoluta; el C resta el trim antes de la planta
+        "delta_e_trim_deg": cv["delta_e_trim_deg"],
 
         "X_u"    : A[0][0],
         "X_w"    : A[0][1],
