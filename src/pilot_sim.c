@@ -1,4 +1,5 @@
 #include "pilot_sim.h"
+#include "sim_settings.h"   // RC_STICK_TO_US
 
 //prototipos
 float step_cmd(uint32_t now_ms, uint32_t time_ms , float value);
@@ -84,4 +85,24 @@ SimRc_s rc_source(pilotcommand_s pilot) {
     rc_out.s[RC_CH_ARM]      = pilot.arm_switch ? 1.0f : 0.0f;
 
     return rc_out;
+}
+
+
+void rc_to_servo_cmds_us(const SimRc_s *rc,
+                         const float trim_us[SERVO_SIM_N_SERVOS],
+                         float cmd_us[SERVO_SIM_N_SERVOS])
+{
+    if (rc == NULL || cmd_us == NULL) return;
+
+    cmd_us[SERVO_AILERON]  = rc->s[RC_CH_ROLL]     * RC_STICK_TO_US;  // Canal 0: Roll -> Aileron
+    cmd_us[SERVO_ELEVATOR] = rc->s[RC_CH_PITCH]    * RC_STICK_TO_US;  // Canal 1: Pitch -> Elevator
+    cmd_us[SERVO_RUDDER]   = rc->s[RC_CH_YAW]      * RC_STICK_TO_US;  // Canal 2: Yaw -> Rudder
+    cmd_us[SERVO_THROTTLE] = rc->s[RC_CH_THROTTLE] * RC_STICK_TO_US;  // Canal 3: Throttle
+
+    /* + trim del transmisor: stick al centro -> superficie en trim */
+    if (trim_us != NULL) {
+        for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
+            cmd_us[i] += trim_us[i];
+        }
+    }
 }

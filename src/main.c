@@ -266,13 +266,9 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
      rc_sim = rc_source(pilot);
 
-     /* Comandos para cada servo basados en los canales RC */
-     /* Canales RC en unidades normalizadas -> delta PWM [us] (RC_STICK_TO_US) */
-     /* + trim del transmisor: stick al centro -> superficie en trim */
-     float aile_cmd = rc_sim.s[RC_CH_ROLL]     * RC_STICK_TO_US + g_trim_us[SERVO_AILERON];   // Canal 0: Roll -> Aileron
-     float elev_cmd = rc_sim.s[RC_CH_PITCH]    * RC_STICK_TO_US + g_trim_us[SERVO_ELEVATOR];  // Canal 1: Pitch -> Elevator
-     float rud_cmd  = rc_sim.s[RC_CH_YAW]      * RC_STICK_TO_US + g_trim_us[SERVO_RUDDER];    // Canal 2: Yaw -> Rudder
-     float thro_cmd = rc_sim.s[RC_CH_THROTTLE] * RC_STICK_TO_US;  // Canal 3: Throttle
+     /* Canales RC -> delta PWM [us] por servo, con trim del transmisor */
+     float servo_cmd_us[SERVO_SIM_N_SERVOS];
+     rc_to_servo_cmds_us(&rc_sim, g_trim_us, servo_cmd_us);
 
      /* Opcional: flaps, modo, armado */
      float flaps_cmd    = rc_sim.s[RC_CH_FLAPS];
@@ -281,10 +277,9 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
      (void)flaps_cmd; (void)mode_cmd; (void)arm_cmd;  // reservados para flight_management (v0.3)
 
      /* Enviar comandos a los servos/actuadores */
-     Servos_SetCmdDeltaUs(SERVO_AILERON, aile_cmd);   // Roll
-     Servos_SetCmdDeltaUs(SERVO_ELEVATOR, elev_cmd);  // Pitch
-     Servos_SetCmdDeltaUs(SERVO_RUDDER, rud_cmd);     // Yaw
-     Servos_SetCmdDeltaUs(SERVO_THROTTLE, thro_cmd);  // Throttle (si es servo o ESC)
+     for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
+         Servos_SetCmdDeltaUs(i, servo_cmd_us[i]);
+     }
 
      /* “Tarea” 1 ms */
      Servos_Update_1ms();
@@ -349,8 +344,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.6f,"                 // Laser
                     "%.6f,%.6f,%.6f,%.6f\n", // dv, dp, dr, dphi
                     (double)t_s,                                            // 1. tiempo
-                    (double)elev_cmd, (double)aile_cmd,                     // comandos us
-                    (double)rud_cmd, (double)thro_cmd,                      //
+                    (double)servo_cmd_us[SERVO_ELEVATOR], (double)servo_cmd_us[SERVO_AILERON],  // comandos us
+                    (double)servo_cmd_us[SERVO_RUDDER], (double)servo_cmd_us[SERVO_THROTTLE],
                     (double)rc_sim.s[RC_CH_PITCH],                          // 6. valores RC
                     (double)rc_sim.s[RC_CH_ROLL],
                     (double)rc_sim.s[RC_CH_YAW],
@@ -400,7 +395,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
         {
             printf("t=%.3f | CMD[us]: E=%.1f A=%.1f R=%.1f T=%.1f | OUT[deg]: E=%.2f A=%.2f R=%.2f T=%.2f\n",
                    (double)t_s,
-                   (double)elev_cmd, (double)aile_cmd, (double)rud_cmd, (double)thro_cmd,
+                   (double)servo_cmd_us[SERVO_ELEVATOR], (double)servo_cmd_us[SERVO_AILERON], (double)servo_cmd_us[SERVO_RUDDER], (double)servo_cmd_us[SERVO_THROTTLE],
                    (double)y_elev, (double)y_ail, (double)y_rud, (double)y_thro);
         }
     #endif
