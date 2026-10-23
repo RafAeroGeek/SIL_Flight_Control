@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdint.h>
+
+#include "servo_sim.h"   // ServoChannel_e, SERVO_SIM_N_SERVOS
 
 #define RC_CH_MAX 16u
 
@@ -51,6 +52,15 @@ typedef struct
 pilotcommand_s pilot_source_commands(uint32_t now_ms, unsigned id_routine);
 
 SimRc_s rc_source(pilotcommand_s pilot);
+
+/* Ruteo canal RC -> servo: sticks normalizados -> delta PWM [us] de cada
+   servo (indice ServoChannel_e), mas el trim del transmisor trim_us[] por
+   servo (NULL = sin trim). Roll -> alerón, pitch -> elevador, yaw -> timón
+   (con signo invertido: convención de Nelson, ver RC_YAW_TO_RUDDER_SIGN),
+   throttle -> ESC. */
+void rc_to_servo_cmds_us(const SimRc_s *rc,
+                         const float trim_us[SERVO_SIM_N_SERVOS],
+                         float cmd_us[SERVO_SIM_N_SERVOS]);
 
 
 #endif // PILOT_SIM_H_INCLUDED

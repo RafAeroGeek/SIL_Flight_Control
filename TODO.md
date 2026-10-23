@@ -19,7 +19,7 @@
 
 ## SECTION 1: Lateral-Directional Dynamics Core
 
-### 1.3 Eigenvalue analysis of lateral A matrix
+### 1.3 Eigenvalue analysis of lateral A matrix ✅
 - **Task:** Compute eigenvalues/eigenvectors to verify stability characteristics
 - **Tools:** Matlab/Python (numpy)
 - **Acceptance:** Report: (λ values, damping ratios, natural frequencies, stability margins)
@@ -38,16 +38,12 @@
 
 ## SECTION 3: Servo & Control Expansion
 
-### 3.2 Acceptance test: servo + pilot commands (lateral)
-- **Task:** Create `test/test_pilot_lateral_servo.c`
-  - Exercise rudder and aileron channels with step inputs
-  - Verify servo saturation limits respected
-  - Verify pilot command routing to servo module
-- **Files:** `test/test_pilot_lateral_servo.c`
-- **Acceptance:** All assertions pass, no undefined behavior detected
-- **Priority:** MEDIUM
-- **Estimate:** 2h
-- **Related:** Previous acceptance test for throttle was vacuous (reads 0 throughout)
+### 3.2 Acceptance test: servo + pilot commands (lateral) ✅
+- **Hecho (2026-10-23):** `test/test_pilot_lateral_servo.c`: ruteo canal RC ->
+  servo (`rc_to_servo_cmds_us`, `pilot_sim.c`), escalón de 1er orden,
+  saturación y limitador de velocidad de alerón y timón, y signo de punta a
+  punta con las derivadas del Ugly Stick (stick derecho -> p > 0, pedal
+  derecho -> r > 0).
 
 ---
 
@@ -84,13 +80,8 @@
 - **Priority:** MEDIUM
 - **Estimate:** 1.5h
 
-### 6.3 Add ctest harness for lateral servo/pilot test
-- **Task:** Register `test/test_pilot_lateral_servo.c` (issue 3.2) in ctest
-- **Note:** Lateral dynamics tests already in ctest (v0.2): `test_rk4_n`,
-  `test_aircraft_loader_lat`, `test_lateral_matrices`
-- **Files:** `CMakeLists.txt`
-- **Priority:** MEDIUM
-- **Estimate:** 0.5h
+### 6.3 Add ctest harness for lateral servo/pilot test ✅
+- **Hecho (2026-10-23):** `test_pilot_lateral_servo` registrado en ctest.
 
 ---
 
@@ -112,7 +103,7 @@
 
 ## SECTION 8: Pendientes v0.2-lateral
 
-### 8.1 Derivadas laterales reales (reemplazar placeholders Navion)
+### 8.1 Derivadas laterales reales (reemplazar placeholders Navion) ✅
 - **Task:** Cargar en `aircraft/ugly_stick.json` las derivadas laterales reales
   (desde MATLAB) y las de `aircraft/aircraft_a.json`.
 - **Hecho (ugly_stick, 2026-10-20):** estimadas con `dynamics/latdir_analysis.py`
@@ -126,10 +117,11 @@
 - **Task:** Contrastar `L_da, L_dr, N_da, N_dr, Y_dr` contra Nelson, apéndice B.
 - **Priority:** MEDIUM
 
-### 8.3 Signo del timón
-- **Observado:** yaw > 0 -> dr < 0 (consistente con `N_dr < 0`, convención de
-  Nelson). Decidir si la convención stick/PWM del rudder debe invertirse.
-- **Priority:** MEDIUM
+### 8.3 Signo del timón ✅
+- **Hecho (2026-10-23):** convención de Nelson: δr > 0 = borde de salida a la
+  izquierda (N_dr < 0, nariz a la izquierda). El pedal derecho (yaw > 0) da
+  δr < 0 y lleva la nariz a la derecha (`RC_YAW_TO_RUDDER_SIGN = -1` en
+  `pilot_sim.c`).
 
 ### 8.4 dpsi como 5º estado
 - **Task:** Agregar dpsi -> GPS `ve` distinto de 0 y heading hold.
