@@ -119,4 +119,14 @@ if(SIL_BUILD_TESTS)
     target_compile_options(test_lon_matrices PRIVATE -Wall)
     target_link_libraries(test_lon_matrices PRIVATE m)
     add_test(NAME test_lon_matrices COMMAND test_lon_matrices)
+
+    add_executable(test_flight_sim_trim
+        test/test_flight_sim_trim.c
+        src/flight_sim.c
+        src/dynamics.c
+    )
+    target_include_directories(test_flight_sim_trim PRIVATE src test)
+    target_compile_options(test_flight_sim_trim PRIVATE -Wall)
+    target_link_libraries(test_flight_sim_trim PRIVATE m)
+    add_test(NAME test_flight_sim_trim COMMAND test_flight_sim_trim)
 endif()
