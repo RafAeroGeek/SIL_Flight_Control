@@ -52,7 +52,7 @@
     "delta_thr_trim": 0.0,
 
     "servo_elevator_tau_s": 0.05,
-    "servo_elevator_k_deg_per_us": 0.18,
+    "servo_elevator_k_deg_per_us": 0.04,
     "servo_elevator_y0_deg": 0.0,
     "servo_elevator_y_min_deg": -25.0,
     "servo_elevator_y_max_deg": 25.0,
