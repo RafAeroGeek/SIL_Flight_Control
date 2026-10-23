@@ -23,6 +23,7 @@ add_executable(SIL_Flight_Control
     src/main.c
     src/dynamics.c
     src/aircraft_loader.c
+    src/atmosphere.c
     src/flight_management.c
     src/flight_sim.c
     src/pilot_sim.c
@@ -129,4 +130,13 @@ if(SIL_BUILD_TESTS)
     target_compile_options(test_flight_sim_trim PRIVATE -Wall)
     target_link_libraries(test_flight_sim_trim PRIVATE m)
     add_test(NAME test_flight_sim_trim COMMAND test_flight_sim_trim)
+
+    add_executable(test_atmosphere
+        test/test_atmosphere.c
+        src/atmosphere.c
+    )
+    target_include_directories(test_atmosphere PRIVATE src test)
+    target_compile_options(test_atmosphere PRIVATE -Wall)
+    target_link_libraries(test_atmosphere PRIVATE m)
+    add_test(NAME test_atmosphere COMMAND test_atmosphere)
 endif()
