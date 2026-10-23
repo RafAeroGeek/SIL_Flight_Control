@@ -2,8 +2,8 @@
 
 **Fecha de revisión:** 2026-10-21
 **Último commit en `main`:** `06d1f23` Merge PR #11 (derivadas longitudinales + ejes cuerpo)
-**Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`)
-**Versión en `CMakeLists.txt`:** 0.2.0
+**Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`), `v0.3-dynamics` (2026-10-22)
+**Versión en `CMakeLists.txt`:** 0.3.0
 
 ---
 
