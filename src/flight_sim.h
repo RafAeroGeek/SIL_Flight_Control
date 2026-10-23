@@ -25,9 +25,9 @@ typedef struct
     double X_lon[4];
     double Xn_lon[4];
 
-    /* Estados lateral-direccionales (Nelson cap. 5): [dv, dp, dr, dphi] */
-    double X_lat[4];
-    double Xn_lat[4];
+    /* Estados lateral-direccionales (Nelson cap. 5): [dv, dp, dr, dphi, dpsi] */
+    double X_lat[DYN_N_LAT];
+    double Xn_lat[DYN_N_LAT];
 
     /* Altitud / otras variables auxiliares */
     double H_m;
@@ -46,8 +46,8 @@ typedef struct
        de espacio de estados */
     double A_lon[4][4];
     double B_lon[4];
-    double A_lat[4][4];
-    double B_lat[4][2];   /* columnas [da, dr] */
+    double A_lat[DYN_N_LAT][DYN_N_LAT];
+    double B_lat[DYN_N_LAT][DYN_M_LAT];   /* columnas [da, dr] */
 
     /* Copia de parámetros */
     Params params;
@@ -65,7 +65,7 @@ typedef struct
     /* Estado inicial */
     double t0_s;
     double X0[4];
-    double X0_lat[4];     /* [dv, dp, dr, dphi] */
+    double X0_lat[DYN_N_LAT];     /* [dv, dp, dr, dphi, dpsi] */
     double H0_m;
 
     /* Actuadores iniciales */
@@ -113,7 +113,7 @@ void FlightSim_Step(FlightSim *sim, double dt_s);
 /* Obtener estado */
 double FlightSim_GetTime(const FlightSim *sim);
 void   FlightSim_GetX(const FlightSim *sim, double out_X4[4]);
-void   FlightSim_GetX_lat(const FlightSim *sim, double out_X4[4]);
+void   FlightSim_GetX_lat(const FlightSim *sim, double out_X[DYN_N_LAT]);
 
 #ifdef __cplusplus
 }

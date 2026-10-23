@@ -123,9 +123,10 @@
   δr < 0 y lleva la nariz a la derecha (`RC_YAW_TO_RUDDER_SIGN = -1` en
   `pilot_sim.c`).
 
-### 8.4 dpsi como 5º estado
-- **Task:** Agregar dpsi -> GPS `ve` distinto de 0 y heading hold.
-- **Priority:** MEDIUM
+### 8.4 dpsi como 5º estado ✅
+- **Hecho (2026-10-23):** lateral 5x5 con dpsi' = sec(θ0)·dr; GPS con la
+  rotación cuerpo -> NED completa (`gps_ve_ms` ≠ 0); columna `dpsi_rad` y
+  rumbo en flightreview. El heading hold va en el Paso 4 (F6).
 
 ### 8.5 Término w0 de ejes cuerpo en la fuerza lateral ✅
 - **Hecho (2026-10-21):** lon y lat en ejes cuerpo: `-w0·dq` y `X_de` en el

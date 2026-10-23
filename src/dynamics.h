@@ -68,10 +68,17 @@ typedef struct {
 // Construye A (4x4) y B (4x1) a partir de Params
 void build_state_space_matrices(const Params *p, double A[4][4], double B[4]);
 
-// Construye A (4x4) y B (4x2) lateral-direccionales (Nelson cap. 5) con
+// Estados lateral-direccionales: [dv, dp, dr, dphi, dpsi]
+#define DYN_N_LAT 5
+#define DYN_M_LAT 2
+
+// Construye A (5x5) y B (5x2) lateral-direccionales (Nelson cap. 5) con
 // correccion por producto de inercia I_xz.
-// x = [dv, dp, dr, dphi] ; u = [da, dr] (rad)
-void build_lateral_matrices(const Params *p, double A[4][4], double B[4][2]);
+// x = [dv, dp, dr, dphi, dpsi] ; u = [da, dr] (rad)
+// dpsi es pura cinematica (dpsi' = sec(theta0)*dr): no realimenta a los
+// demas estados, asi que agrega un eigenvalor en 0 y deja los otros igual.
+void build_lateral_matrices(const Params *p, double A[DYN_N_LAT][DYN_N_LAT],
+                            double B[DYN_N_LAT][DYN_M_LAT]);
 
 // xdot = A*x + B*u  (x, xdot de tamaño 4; B es 4x1; u escalar)
 void longitudinal_dynamics(const double X[4], double U,

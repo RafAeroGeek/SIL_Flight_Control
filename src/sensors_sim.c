@@ -190,30 +190,41 @@ static double sensors_get_phi_rad(const FlightSim *sim)
     return sim->X_lat[3];
 }
 
+static double sensors_get_psi_rad(const FlightSim *sim)
+{
+    if (!sim) return 0.0;
+
+    /*
+     * Estado lateral X_lat[4] = dpsi (rumbo de trim psi0 = 0: hacia el Norte).
+     */
+    return sim->X_lat[4];
+}
+
 static void sensors_get_v_ned_ms(const FlightSim *sim,
                                  double *vn, double *ve, double *vd)
 {
-    double u = sensors_get_u_body_ms(sim);
-    double w = sensors_get_w_body_ms(sim);
-    double theta = sensors_get_theta_rad(sim);
+    const double u = sensors_get_u_body_ms(sim);
+    const double v = sensors_get_v_body_ms(sim);
+    const double w = sensors_get_w_body_ms(sim);
+
+    const double cph = cos(sensors_get_phi_rad(sim)),   sph = sin(sensors_get_phi_rad(sim));
+    const double cth = cos(sensors_get_theta_rad(sim)), sth = sin(sensors_get_theta_rad(sim));
+    const double cps = cos(sensors_get_psi_rad(sim)),   sps = sin(sensors_get_psi_rad(sim));
 
     /*
-     * Conversión cuerpo -> NED simplificada longitudinal.
+     * Velocidad cuerpo -> NED con la matriz de rotación completa (secuencia
+     * 3-2-1: psi, theta, phi), sin viento:
      *
-     * Asumimos:
-     * - no hay velocidad lateral
-     * - no hay heading todavía
-     * - todo se mueve sobre el eje Norte
+     *   [V_N]   [ cth*cps   sph*sth*cps - cph*sps   cph*sth*cps + sph*sps ] [u]
+     *   [V_E] = [ cth*sps   sph*sth*sps + cph*cps   cph*sth*sps - sph*cps ] [v]
+     *   [V_D]   [ -sth      sph*cth                 cph*cth               ] [w]
      *
-     * ve = 0 mientras no exista dpsi como estado (el modelo lateral
-     * tiene solo [dv, dp, dr, dphi]).
-     *
-     * V_N = u cos(theta) + w sin(theta)
-     * V_D = -u sin(theta) + w cos(theta)
+     * Con phi = psi = 0 y v = 0 queda la forma longitudinal de antes
+     * (V_N = u cth + w sth, V_E = 0, V_D = -u sth + w cth).
      */
-    *vn = u * cos(theta) + w * sin(theta);
-    *ve = 0.0;
-    *vd = -u * sin(theta) + w * cos(theta);
+    *vn = cth * cps * u + (sph * sth * cps - cph * sps) * v + (cph * sth * cps + sph * sps) * w;
+    *ve = cth * sps * u + (sph * sth * sps + cph * cps) * v + (cph * sth * sps - sph * cps) * w;
+    *vd = -sth * u      +  sph * cth * v                    +  cph * cth * w;
 }
 
 /* ============================================================

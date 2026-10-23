@@ -12,7 +12,7 @@ CSV con un eje temporal y resuelve los nombres de columna de forma flexible.
   **hover** con valor + timestamp; eje de tiempo **enlazado** entre todas.
 - Gráficas predefinidas: **actitud**, **rapidez angular**, **vibración**.
 - Servidor con pestañas: **Dinámica Longitudinal** (du, dw, dq, dtheta),
-  **Dinámica Lat-Dir** (dv, dp, dr, dphi), control de superficies, sensores y
+  **Dinámica Lat-Dir** (dv, dp, dr, dphi, dpsi), control de superficies, sensores y
   resumen.
 - Tasas del estado (dp, dq, dr) en **discontinua** sobre los giróscopos en
   *Rapidez angular* y *Sensores / IMU* (estado verdadero frente a medición).
@@ -55,8 +55,6 @@ flightreview/            (paquete importable: layout plano)
 
 ## Pendientes conocidos
 
-- De Roll/Pitch/Yaw hay roll (`dphi_rad`) y pitch (`dtheta_rad`); yaw (`dpsi`)
-  aún no es un estado del simulador.
 - Los setpoints de actitud aún no se registran en el CSV (trazas cableadas y
   vacías).
 - `mode` es constante `0` en los datos actuales; el fondo por modo se ve como

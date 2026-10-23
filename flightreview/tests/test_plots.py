@@ -94,11 +94,19 @@ def test_cada_builder_devuelve_figura_con_series_y_hover(synthetic_csv):
         assert m.x_range is xr
 
 
-def test_actitud_roll_pitch_presentes_yaw_no(synthetic_csv):
+def test_actitud_roll_pitch_yaw_presentes(synthetic_csv):
     log = load_log(synthetic_csv)
     fig = PREDEFINED[0].render(log, log_source(log), new_x_range(log))
+    assert len(_lines(fig)) == 3  # roll (dphi) + pitch (dtheta) + yaw (dpsi)
+    assert "no disponible" not in fig.title.text
+
+
+def test_actitud_log_viejo_sin_yaw(tmp_path, synthetic_df):
+    p = tmp_path / "sin_dpsi.csv"
+    synthetic_df.drop(columns=["dpsi_rad"]).to_csv(p, index=False)
+    log = load_log(str(p))
+    fig = PREDEFINED[0].render(log, log_source(log), new_x_range(log))
     assert len(_lines(fig)) == 2  # roll (dphi) + pitch (dtheta)
-    assert "no disponible" in fig.title.text
     assert "Yaw" in fig.title.text and "Roll" not in fig.title.text
 
 
@@ -140,13 +148,13 @@ def _lat_dir(log):
     return PlotGroup("Estados", lat_dir_dynamics.build).render(log, log_source(log), xr), xr
 
 
-def test_lat_dir_cuatro_figuras(synthetic_csv):
+def test_lat_dir_cinco_figuras(synthetic_csv):
     log = load_log(synthetic_csv)
     col, xr = _lat_dir(log)
     figs = col.children
     assert [f.title.text for f in figs] == [
         "Velocidad lateral (dv)", "Tasa de alabeo (dp)",
-        "Tasa de guinada (dr)", "Angulo de alabeo (dphi)",
+        "Tasa de guinada (dr)", "Angulo de alabeo (dphi)", "Rumbo (dpsi)",
     ]
     for f in figs:
         assert len(_lines(f)) == 1
@@ -159,7 +167,7 @@ def test_lat_dir_cuatro_figuras(synthetic_csv):
 def test_lat_dir_sin_columnas_laterales(tmp_path, synthetic_df):
     # CSV longitudinal (p. ej. linea base previa a v0.2-lateral).
     p = tmp_path / "solo_lon.csv"
-    synthetic_df.drop(columns=["dv_mps", "dp_radps", "dr_radps", "dphi_rad "]).to_csv(p, index=False)
+    synthetic_df.drop(columns=["dv_mps", "dp_radps", "dr_radps", "dphi_rad ", "dpsi_rad"]).to_csv(p, index=False)
     col, _ = _lat_dir(load_log(str(p)))
     for f in col.children:
         assert "(no disponible)" in f.title.text
