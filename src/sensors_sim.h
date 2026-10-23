@@ -53,9 +53,9 @@ typedef struct
 {
     bool   enable_noise;
 
-    /* Pitot */
-    double pitot_noise_std_ms;
-    double pitot_bias_ms;
+    /* Pitot: ruido y bias del sensor de presión diferencial */
+    double pitot_dp_noise_std_pa;
+    double pitot_dp_bias_pa;
 
     /* Gyros */
     double gyro_noise_std_radps;
@@ -116,8 +116,9 @@ typedef struct
 {
     bool valid;
 
-    double airspeed_ms;
-    double dynamic_pressure_pa;
+    double diff_pressure_pa;   // Δp medida (con ruido y bias) [Pa]
+    double ias_ms;             // IAS = sqrt(2 Δp / rho0) [m/s]
+    double tas_ms;             // TAS = IAS sqrt(rho0 / rho(h)) [m/s]
 
 } SensorPitotData;
 

@@ -139,4 +139,16 @@ if(SIL_BUILD_TESTS)
     target_compile_options(test_atmosphere PRIVATE -Wall)
     target_link_libraries(test_atmosphere PRIVATE m)
     add_test(NAME test_atmosphere COMMAND test_atmosphere)
+
+    add_executable(test_sensors
+        test/test_sensors.c
+        src/sensors_sim.c
+        src/flight_sim.c
+        src/dynamics.c
+        src/atmosphere.c
+    )
+    target_include_directories(test_sensors PRIVATE src test)
+    target_compile_options(test_sensors PRIVATE -Wall)
+    target_link_libraries(test_sensors PRIVATE m)
+    add_test(NAME test_sensors COMMAND test_sensors)
 endif()

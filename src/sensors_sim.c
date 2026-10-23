@@ -1,4 +1,5 @@
 #include "sensors_sim.h"
+#include "atmosphere.h"
 
 #include <string.h>
 #include <math.h>
@@ -253,45 +254,46 @@ static void SensorsSim_UpdatePitot(SensorsSim *ss,
                                    const FlightSim *sim)
 {
     /*
-     * Tu estado X[0] = du.
-     * La velocidad total Viento:
+     * Tubo pitot-estático con sensor de presión diferencial.
+     * Teoría: docs/teoria/sensores/ruido_sensores.tex
      *
-     * V = V0 + dV
-     *                     dw
-     * dV = du + w0_ms * ------
-     *                    u0_ms
+     * Velocidad verdadera respecto al aire (sin viento), no lineal:
      *
-     * Aircraft systems identification Morelli Pag.81
+     *   V = sqrt(u^2 + v^2 + w^2),  u = u0 + du, v = dv, w = w0 + dw
+     *
+     * Presión de impacto incompresible (M ~ 0.07: error < 0.2 %):
+     *
+     *   Δp = 1/2 rho(h) V^2 + bias + ruido      rho(h): ISA
+     *
+     * El ruido entra en la presión, no en la velocidad. Salidas:
+     *
+     *   IAS = sqrt(2 Δp / rho0)      TAS = IAS sqrt(rho0 / rho(h))
+     *
+     * Δp < 0 por ruido a baja velocidad -> IAS = TAS = 0.
      */
     if (!ss->cfg.pitot_enabled) {
         ss->data.pitot.valid = false;
         return;
     }
 
-    const double V0 = (double)sim->params.V0_ms;
+    const double u = sensors_get_u_body_ms(sim);
+    const double v = sensors_get_v_body_ms(sim);
+    const double w = sensors_get_w_body_ms(sim);
 
-    const double u0 = (double)sim->params.u0_ms;
+    const double V_true = sqrt(u * u + v * v + w * w);
+    const double rho    = Atmosphere_IsaDensity(ss->alt_m);
 
-    const double w0 = (double)sim->params.w0_ms;
+    double dp = 0.5 * rho * V_true * V_true;
 
-    double du = sim->X_lon[0];
+    dp += ss->cfg.noise.pitot_dp_bias_pa;
+    dp += sensors_noise(ss, SENSORS_RNG_PITOT, ss->cfg.noise.pitot_dp_noise_std_pa);
 
-    double dw = sim->X_lon[1];
-
-    double dV = du + w0 * dw / u0;
-
-    const double rho0 = 1.225;
-
-    double v_air = V0 + dV ;
-
-    v_air += ss->cfg.noise.pitot_bias_ms;
-    v_air += sensors_noise(ss, SENSORS_RNG_PITOT, ss->cfg.noise.pitot_noise_std_ms);
-
-    v_air = clamp_min(v_air, 0.0);
+    const double ias = sqrt(2.0 * clamp_min(dp, 0.0) / ISA_RHO0_KG_M3);
 
     ss->data.pitot.valid = true;
-    ss->data.pitot.airspeed_ms = v_air;
-    ss->data.pitot.dynamic_pressure_pa = 0.5 * rho0 * v_air * v_air;
+    ss->data.pitot.diff_pressure_pa = dp;
+    ss->data.pitot.ias_ms = ias;
+    ss->data.pitot.tas_ms = ias * sqrt(ISA_RHO0_KG_M3 / rho);
 }
 
 static void SensorSim_UpdateVanes(SensorsSim *ss,
