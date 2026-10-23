@@ -252,7 +252,8 @@ En `src/sim_settings.h`:
 - `SIM_PILOT_ROUTINE` — rutina del piloto simulado. Por defecto
   `ROUTINE_LAT_DIR`: el mismo `pitch` que `ROUTINE_LONGITUDINAL` (doblete de
   ±0.25 de stick, 1–3 s) más un doblete
-  de alerón (±1.8°, 1–3 s) y uno de timón (±2.7°, 5–7 s). `ROUTINE_LONGITUDINAL`
+  de alerón (±1.8°, 1–3 s) y uno de timón (±2.7°, 5–7 s; pedal derecho
+  primero, que con la convención de Nelson es δr < 0). `ROUTINE_LONGITUDINAL`
   satura el alerón a 20° y queda solo para la regresión longitudinal.
 
 El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad`.
