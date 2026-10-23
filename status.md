@@ -1,8 +1,8 @@
 # Status del proyecto — SIL_Flight_Control
 
-**Fecha de revisión:** 2026-10-21
-**Último commit en `main`:** `06d1f23` Merge PR #11 (derivadas longitudinales + ejes cuerpo)
-**Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`), `v0.3-dynamics` (2026-10-22)
+**Fecha de revisión:** 2026-10-23
+**Último commit en `main`:** `487045c` Merge PR #16 (test lateral + signo del timón)
+**Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`), `v0.3-dynamics` (2026-10-22, `717c056`)
 **Versión en `CMakeLists.txt`:** 0.3.0
 
 ---
@@ -10,23 +10,18 @@
 ## 1. Estado actual
 
 ### Git
-- `main` al día con `origin/main`; PRs #1–#11 mergeados.
-- Rama `feat/derivadas-longitudinales-ugly` (local y remota) ya mergeada en #11:
-  se puede borrar.
-- Siguen los **4 stashes viejos** de `dinamica-longitudinal-sensores`:
-  - `stash@{0}`–`{2}`: contenido que ya está en `main` o binarios de build.
-  - `stash@{3}`: un `data.zip` de 3.4 MB → revisarlo antes de descartar.
-- Carpeta `build_tests/` en la raíz: build viejo (ignorado por git), residuo.
+- `main` al día con `origin/main`; PRs #1–#16 mergeados.
+- Sin ramas pendientes ni stashes; `build_tests/` borrado.
 
-### Build y tests (verificado 2026-10-22)
-- Compila con **0 warnings** `-Wall` (6.1 hecho en PR #9).
-- **ctest: 9/9** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
-  `test_aircraft_loader_lat`, `test_lateral_matrices`, `test_lon_matrices`,
-  `test_flight_sim_trim`, `test_atmosphere`, `test_sensors`).
+### Build y tests (verificado 2026-10-23)
+- Compila con **0 warnings** `-Wall`.
+- **ctest: 10/10** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
+  `test_aircraft_loader_lat`, `test_lateral_matrices`,
+  `test_pilot_lateral_servo`, `test_lon_matrices`, `test_flight_sim_trim`,
+  `test_atmosphere`, `test_sensors`).
 - **pytest: 64/64** (`dynamics/` 16 + `flightreview/` 48).
-- Línea base de regresión vigente: `data/baseline_2220e20.csv` (local, no
-  trackeada; pitot con Δp/ISA, ruido de veleta, LCG por sensor). Las
-  anteriores (`e041d25`, `5ea17b6`) ya no aplican.
+- Línea base de regresión vigente: `data/baseline_487045c.csv` (local, no
+  trackeada). Las anteriores ya no aplican.
 - Documentación teórica en `docs/teoria/` (LaTeX):
   `sensores/ruido_sensores.tex`.
 
@@ -44,6 +39,13 @@
   - C en **ejes cuerpo** en ambos canales (`−w0·dq`, `X_de`, `+w0·dp`,
     `tan θ0·dr`) y sensores con `w = w0 + dw`, `θ = θ0 + dθ` (8.5 y 8.6).
   - Pitch de ambas rutinas: doblete 1–3 s; τ de elevador y alerón 0.05 s.
+- **Después de `v0.3-dynamics` (PRs #14–#16):**
+  - Trim del elevador (−0.49°) con trim de transmisor; servo de elevador
+    k = 0.04 °/µs.
+  - Pitot con Δp, ISA e IAS/TAS; ruido en la veleta; una secuencia de ruido
+    por sensor.
+  - Timón con la convención de Nelson (pedal derecho → δr < 0 → nariz a la
+    derecha) y test de la cadena lateral piloto → servo → planta.
 
 ### Modos del Ugly Stick (estimación teórica)
 | Modo | λ | ωn [rad/s] | ζ |
@@ -60,24 +62,17 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 
 ## 2. Pendientes (consolidado de TODO.md + código)
 
-### Alta prioridad
-| # | Pendiente | Nota |
-|---|---|---|
-| — | — | 4.1 (pitot) hecho el 2026-10-22. |
-
 ### Media prioridad
 | # | Pendiente |
 |---|---|
-| 8.12 | Validar inercias (I_x, I_y, I_z) y factores empíricos lon/lat con péndulo bifilar y dobletes en vuelo |
-| 3.2 / 6.3 | Test `test_pilot_lateral_servo.c` + registrarlo en ctest |
+| 8.4 | `dpsi` como 5º estado (GPS `ve` ≠ 0, heading hold) → F1 del Paso 4 |
+| 5.1 / 8.9 | `flight_management.c` y tareas 5/30/150/500 ms de `main.c` vacías → Paso 4 |
+| 8.12 | Validar inercias (I_x, I_y, I_z), factores empíricos y σ de pitot/veleta con datos de banco y de vuelo |
 | 8.2 | Contrastar derivadas de control del Navion con Nelson apéndice B |
-| 8.3 | Decidir convención de signo del timón (yaw>0 → dr<0) |
-| 8.4 | `dpsi` como 5º estado (GPS `ve` ≠ 0, heading hold) |
 
-### Baja prioridad / v0.3
+### Baja prioridad
 | # | Pendiente |
 |---|---|
-| 5.1 / 8.9 | `flight_management.c` y tareas 5/30/150/500 ms de `main.c` vacías |
 | 8.14 | `aircraft_a.json` (lon manual, lat Navion) se integra ahora en ejes cuerpo con `w0_ms = 4.71`: regenerarla o poner `w0_ms = 0` |
 | 8.8 | Migrar longitudinal a `rk4_step_n` y borrar `rk4_step` |
 | 8.11 | Typo `L_v` en diapositivas |
@@ -89,35 +84,27 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 
 ---
 
-## 3. Plan propuesto
+## 3. Plan
 
-### Paso 0 — Higiene (~30 min, no cambia el simulador)
-1. Borrar `feat/derivadas-longitudinales-ugly` (local + remoto).
-2. Revisar `stash@{3}` (`data.zip`) y descartar los stashes.
-3. Borrar `build_tests/`.
-4. Tag `v0.3-dynamics` (o similar) sobre `main` para marcar el modelo en ejes
-   cuerpo con derivadas del Ugly Stick; subir `CMakeLists.txt` de versión.
+Pasos 0–3 hechos (higiene y tag `v0.3-dynamics`, trim del elevador, pitot y
+veleta, test lateral y signo del timón).
 
-### Paso 1 — Planta coherente con el trim (8.13) ✅ 2026-10-22
-- La planta resta δ_trim; trim de transmisor en `main.c`; `a_aircraft.py`
-  escribe `delta_e_trim_deg`.
-- Servo de elevador con k = 0.04 deg/µs (valor real): el doblete queda en
-  −0.49 ± 5° y ya no satura el modelo lineal; la amplitud de la rutina no se
-  cambia.
+### Paso 4 — v0.4: control lateral (8.4 / 5.1 / 8.9)
+Una rama y un PR por fase; al final de cada una se revisa y se decide si se
+inserta algo antes de seguir.
 
-### Paso 2 — Fidelidad de sensores (4.1 pitot + 8.7) ✅ 2026-10-22
-- ISA en C, pitot con ruido en Δp e IAS/TAS, ruido en α y β, LCG por sensor.
-  Teoría en `docs/teoria/sensores/ruido_sensores.tex`.
+| Fase | Contenido |
+|---|---|
+| F1 | `dpsi` como 5º estado: lateral 5x5 (ψ̇ = r·sec θ0), GPS con rumbo, columna `dpsi_rad` |
+| F2 | Diseño de ganancias en Python (clásico en cascada, ζ_DR ≥ 0.4, espiral estable) + `docs/teoria/control/control_lateral.tex` |
+| F3 | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) + AHRS ideal con ruido |
+| F4 | Yaw damper |
+| F5 | Modo estabilizado: wing leveler, stick → φ_cmd |
+| F6 | Heading hold + rutina de piloto con cambio de modo |
+| F7 | flightreview con setpoints, docs, tag `v0.4-control` |
 
-### Paso 3 — Tests de integración lateral (3.2 / 6.3)
-- `test_pilot_lateral_servo.c`: escalones en alerón y timón, saturación,
-  ruteo canal→servo. Registrar en ctest.
-
-### Paso 4 — v0.3: control (5.1 / 8.9 / 8.4)
-- `dpsi` como 5º estado.
-- `flight_management.c`: yaw damper (el dutch roll tiene ζ = 0.10) → wing
-  leveler (la espiral es inestable) → heading hold; usar las tareas vacías.
-- Emitir `mode` y setpoints en el CSV → flightreview ya los sabe pintar.
+Modos (`mode_switch`): 0 MANUAL, 1 estabilizado, 2 heading hold.
+Fuera de alcance: control longitudinal y estimador de actitud real (AHRS).
 
 ### Opcional en paralelo
 - 8.14 (`aircraft_a.json`), 8.8 (unificar RK4), mejoras de flightreview.
