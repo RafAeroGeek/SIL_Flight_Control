@@ -372,8 +372,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.0f,%.0f,"             // mode, arm
                     "%.6f,%.6f,%.6f,%.6f,"  // du, dw, dq, dtheta
                     "%.6f,%.6f,%.6f,%.6f,%.6f,"  // IAS, TAS, Δp, AoA, SideSlip
-                    "%.3f,%.3f,%.3f,"       // giros
-                    "%.3f,%.3f,%.3f,"       // acelerometros
+                    "%.6f,%.6f,%.6f,"       // giros [rad/s] (ruido sigma 0.002)
+                    "%.6f,%.6f,%.6f,"       // acelerometros [m/s^2]
                     "%.7f,%.7f,%.3f,"       // gps lat, lon [deg] (1e-7 deg ~ 1 cm), alt
                     "%.3f,%.3f,%.3f,"       // gps vn ve vd
                     "%.6f,"                 // Laser
