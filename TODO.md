@@ -187,12 +187,11 @@
   ajustar Cnr/Clβ y Cmq con datos de vuelo (respuesta a dobletes).
 - **Priority:** MEDIUM
 
-### 8.13 Trim del elevador
-- **Task:** `lon_analysis.py` calcula δe_trim (−0.49° en el Ugly Stick) pero
-  `delta_e_trim_deg` queda en 0: `flight_sim.c` mete el elevador absoluto como
-  perturbación, así que un trim ≠ 0 arrancaría el avión perturbado. Restar el
-  trim antes de la planta y luego escribirlo desde `a_aircraft.py`.
-- **Priority:** MEDIUM
+### 8.13 Trim del elevador ✅
+- **Hecho (2026-10-22):** la planta recibe `δ − δ_trim` (`flight_sim.c`),
+  `main.c` aplica un trim de transmisor `δ_trim / k` en µs y arranca los servos
+  en trim, y `a_aircraft.py` escribe `delta_e_trim_deg` (−0.49° en el Ugly
+  Stick). Línea base `e041d25`.
 
 ### 8.14 aircraft_a.json en ejes cuerpo
 - **Task:** Sus derivadas longitudinales son manuales y las laterales del
