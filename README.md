@@ -90,19 +90,27 @@ Nelson, *Flight Stability and Automatic Control*, cap. 5. Pequeñas perturbacion
 alrededor de vuelo recto y nivelado, en **ejes cuerpo**:
 
 ```
-      | Y_v   Y_p + w0   -(u0 - Y_r)   g·cos(θ0) |          |  0     Y_dr |
-  A = | L_v   L_p         L_r           0        |      B = | L_da   L_dr |
-      | N_v   N_p         N_r           0        |          | N_da   N_dr |
-      | 0     1           tan(θ0)       0        |          |  0     0    |
+x = [dv, dp, dr, dphi, dpsi]      u = [da, dr]
+
+      | Y_v   Y_p + w0   -(u0 - Y_r)   g·cos(θ0)  0 |          |  0     Y_dr |
+      | L_v   L_p         L_r           0          0 |          | L_da   L_dr |
+  A = | N_v   N_p         N_r           0          0 |      B = | N_da   N_dr |
+      | 0     1           tan(θ0)       0          0 |          |  0     0    |
+      | 0     0           sec(θ0)       0          0 |          |  0     0    |
 ```
+
+`dpsi` (rumbo, ψ0 = 0 hacia el Norte) es cinemática pura: no realimenta, así
+que agrega un eigenvalor en 0 y deja los demás modos igual.
 
 `build_lateral_matrices` (`src/dynamics.c`) aplica además la corrección por
 producto de inercia: con `D = 1 - I_xz²/(I_x·I_z)`, las filas L y N usan
 `L*x + (I_xz/I_x)·N*x` y `N*x + (I_xz/I_z)·L*x` (`L*x = L_x/D`, `N*x = N_x/D`).
 
-Supuestos: canales desacoplados (integrar el lateral no cambia el
-longitudinal); no hay `dpsi`, así que la velocidad Este del GPS sigue en 0.
-Los sensores usan los mismos ejes: `w = w0 + dw` y `θ = θ0 + dθ`.
+Supuestos: canales desacoplados (integrar el lateral no cambia el estado
+longitudinal). Los sensores usan los mismos ejes: `w = w0 + dw` y
+`θ = θ0 + dθ`. El GPS pasa (u, v, w) a NED con la matriz de rotación completa
+(φ, θ, ψ), así que `gps_ve_ms` refleja el rumbo y la altitud integrada siente
+el alabeo a segundo orden.
 
 **Trim de superficies.** Los servos dan la deflexión absoluta; la planta
 integra la perturbación `dδ = δ − δ_trim` (`FlightSim_SetActuatorsFromFM`,
@@ -161,14 +169,15 @@ cmake --build build && ./build/SIL_Flight_Control > /dev/null
 
 # 3) Comparar
 python3 test/compare_csv_cols.py data/baseline_<commit_base>.csv data/SIL_sim_servos2.csv \
-    --cols t_s,du_mps,dw_mps,dq_radps,dtheta_rad,y_elev_deg,AoA_deg,gyro_y_radps,acc_x_mps2,gps_alt_m,laser_alt_m
+    --cols t_s,du_mps,dw_mps,dq_radps,dtheta_rad,y_elev_deg,AoA_deg,gyro_y_radps,acc_x_mps2
 ```
 
 La línea base puede generarse con `ROUTINE_LONGITUDINAL` y la comparación
 correrse con `ROUTINE_LAT_DIR`: ambas rutinas tienen el mismo `pitch`, así que el
-estado longitudinal debe coincidir. Las columnas del pitot (`pitot_ms`,
-`tas_ms`, `dp_pa`) **no** entran en esa comparación: V = √(u²+v²+w²) incluye el
-`v` lateral. Cada sensor tiene su propia secuencia de ruido, así que agregar o
+estado longitudinal debe coincidir. **No** entran en esa comparación las
+columnas del pitot (`pitot_ms`, `tas_ms`, `dp_pa`: V = √(u²+v²+w²) incluye el
+`v` lateral) ni las de altitud (`gps_alt_m`, `laser_alt_m`: V_D depende de φ y
+v a segundo orden). Cada sensor tiene su propia secuencia de ruido, así que agregar o
 quitar ruido en uno no cambia las columnas de los demás.
 
 La línea base vigente es `2220e20` (pitot con Δp e ISA, ruido de veleta,
