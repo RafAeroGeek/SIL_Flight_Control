@@ -62,13 +62,27 @@ static double sensors_rand_normal(uint32_t *state, double std)
     return (sum - 6.0) * std;
 }
 
-static double sensors_noise(SensorsSim *ss, double std)
+static double sensors_noise(SensorsSim *ss, SensorsRng_e rng, double std)
 {
     if (!ss->cfg.noise.enable_noise) {
         return 0.0;
     }
 
-    return sensors_rand_normal(&ss->rng_state, std);
+    return sensors_rand_normal(&ss->rng_state[rng], std);
+}
+
+/* Semilla de la secuencia k a partir de la semilla global: mezcla tipo
+ * splitmix32 de seed + k*0x9E3779B9, para que las secuencias de LCG de los
+ * sensores no sean la misma desplazada unos pocos pasos. Nunca devuelve 0. */
+static uint32_t sensors_seed_stream(uint32_t seed, uint32_t k)
+{
+    uint32_t z = seed + (k + 1u) * 0x9E3779B9u;
+
+    z = (z ^ (z >> 16)) * 0x85EBCA6Bu;
+    z = (z ^ (z >> 13)) * 0xC2B2AE35u;
+    z =  z ^ (z >> 16);
+
+    return (z == 0u) ? 1u : z;
 }
 
 /* ============================================================
@@ -271,7 +285,7 @@ static void SensorsSim_UpdatePitot(SensorsSim *ss,
     double v_air = V0 + dV ;
 
     v_air += ss->cfg.noise.pitot_bias_ms;
-    v_air += sensors_noise(ss, ss->cfg.noise.pitot_noise_std_ms);
+    v_air += sensors_noise(ss, SENSORS_RNG_PITOT, ss->cfg.noise.pitot_noise_std_ms);
 
     v_air = clamp_min(v_air, 0.0);
 
@@ -383,17 +397,17 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
     gy += ss->cfg.noise.gyro_bias_y_radps;
     gz += ss->cfg.noise.gyro_bias_z_radps;
 
-    gx += sensors_noise(ss, ss->cfg.noise.gyro_noise_std_radps);
-    gy += sensors_noise(ss, ss->cfg.noise.gyro_noise_std_radps);
-    gz += sensors_noise(ss, ss->cfg.noise.gyro_noise_std_radps);
+    gx += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
+    gy += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
+    gz += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
 
     ax += ss->cfg.noise.accel_bias_x_mps2;
     ay += ss->cfg.noise.accel_bias_y_mps2;
     az += ss->cfg.noise.accel_bias_z_mps2;
 
-    ax += sensors_noise(ss, ss->cfg.noise.accel_noise_std_mps2);
-    ay += sensors_noise(ss, ss->cfg.noise.accel_noise_std_mps2);
-    az += sensors_noise(ss, ss->cfg.noise.accel_noise_std_mps2);
+    ax += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
+    ay += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
+    az += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
 
     ss->data.imu.valid = true;
 
@@ -419,9 +433,9 @@ static void SensorsSim_UpdateGps(SensorsSim *ss,
     double vn, ve, vd;
     sensors_get_v_ned_ms(sim, &vn, &ve, &vd);
 
-    double lat_m_noise = sensors_noise(ss, ss->cfg.noise.gps_pos_noise_std_m);
-    double lon_m_noise = sensors_noise(ss, ss->cfg.noise.gps_pos_noise_std_m);
-    double alt_noise   = sensors_noise(ss, ss->cfg.noise.gps_alt_noise_std_m);
+    double lat_m_noise = sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_pos_noise_std_m);
+    double lon_m_noise = sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_pos_noise_std_m);
+    double alt_noise   = sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_alt_noise_std_m);
 
     double lat_noise_rad = lat_m_noise / SENSORS_SIM_EARTH_RADIUS_M;
 
@@ -432,9 +446,9 @@ static void SensorsSim_UpdateGps(SensorsSim *ss,
 
     double lon_noise_rad = lon_m_noise / (SENSORS_SIM_EARTH_RADIUS_M * cos_lat2);
 
-    double vn_meas = vn + sensors_noise(ss, ss->cfg.noise.gps_vel_noise_std_ms);
-    double ve_meas = ve + sensors_noise(ss, ss->cfg.noise.gps_vel_noise_std_ms);
-    double vd_meas = vd + sensors_noise(ss, ss->cfg.noise.gps_vel_noise_std_ms);
+    double vn_meas = vn + sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_vel_noise_std_ms);
+    double ve_meas = ve + sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_vel_noise_std_ms);
+    double vd_meas = vd + sensors_noise(ss, SENSORS_RNG_GPS, ss->cfg.noise.gps_vel_noise_std_ms);
 
     ss->data.gps.valid = true;
 
@@ -459,7 +473,7 @@ static void SensorsSim_UpdateLaser(SensorsSim *ss)
     double range = ss->alt_m - ss->cfg.ground_alt_m;
 
     range += ss->cfg.noise.laser_bias_m;
-    range += sensors_noise(ss, ss->cfg.noise.laser_noise_std_m);
+    range += sensors_noise(ss, SENSORS_RNG_LASER, ss->cfg.noise.laser_noise_std_m);
 
     range = clamp_min(range, 0.0);
 
@@ -496,9 +510,8 @@ void SensorsSim_Init(SensorsSim *ss,
         ss->alt_m = sim->H_m;
     }
 
-    ss->rng_state = cfg->random_seed;
-    if (ss->rng_state == 0u) {
-        ss->rng_state = 1u;
+    for (uint32_t k = 0u; k < (uint32_t)SENSORS_RNG_N; ++k) {
+        ss->rng_state[k] = sensors_seed_stream(cfg->random_seed, k);
     }
 
     ss->prev_u_ms = sensors_get_u_body_ms(sim);

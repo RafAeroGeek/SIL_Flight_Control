@@ -26,6 +26,18 @@ extern "C" {
  * Tipos auxiliares
  * ============================================================ */
 
+/* Una secuencia pseudoaleatoria por sensor: agregar o quitar ruido en uno
+ * no desplaza la secuencia de los demás. */
+typedef enum
+{
+    SENSORS_RNG_PITOT = 0,
+    SENSORS_RNG_VANE,
+    SENSORS_RNG_IMU,
+    SENSORS_RNG_GPS,
+    SENSORS_RNG_LASER,
+    SENSORS_RNG_N
+} SensorsRng_e;
+
 typedef struct
 {
     double x;
@@ -189,8 +201,8 @@ typedef struct
     double prev_v_ms;
     bool   prev_valid;
 
-    /* Generador pseudoaleatorio */
-    uint32_t rng_state;
+    /* Generador pseudoaleatorio: un estado por sensor (SensorsRng_e) */
+    uint32_t rng_state[SENSORS_RNG_N];
 
 } SensorsSim;
 
