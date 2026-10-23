@@ -188,7 +188,8 @@ aplican.
 
 La teoría de los modelos va en LaTeX, un documento por tema (ver
 `docs/teoria/README.md`). Hoy: `docs/teoria/sensores/ruido_sensores.tex`
-(pitot, veleta, ISA y generador de ruido). Compilar con
+(pitot, veleta, ISA y generador de ruido) y
+`docs/teoria/control/control_lateral.tex` (diseño del control lateral). Compilar con
 `cd docs/teoria/sensores && latexmk -pdf ruido_sensores.tex`.
 
 ## Derivadas de estabilidad (`dynamics/`)
