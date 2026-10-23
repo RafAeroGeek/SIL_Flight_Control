@@ -7,6 +7,7 @@
 #include "aircraft_loader.h"
 #include "dynamics.h"
 #include "flight_sim.h"
+#include "flight_management.h"
 #include "sim_PWM_processing.h"
 #include "sim_task_management.h"
 #include "servo_sim.h"
@@ -133,6 +134,13 @@ void task_init_1ms(void)
     SensorsSim_Init(&g_sensors, &scfg, &g_sim);
 
     FlightSim_Actuators_init(&g_act, &g_params);
+
+    /* Flight management: arranca en MANUAL (paso directo de los sticks).
+       Los campos de lazos de FM_Config se llenan al implementar cada modo. */
+    FM_Config fm_cfg = {0};
+    fm_cfg.thr_min = 0.0f;
+    fm_cfg.thr_max = 1.0f;
+    FM_Init(&fm_cfg, FM_MODE_MANUAL);
 
     /* 3) Servos: base = tabla compilada; overrides opcionales del JSON de la
        aeronave (dt_s se mantiene en el default: es del arnes SIL, no del
@@ -271,15 +279,37 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
      rc_sim = rc_source(pilot);
 
-     /* Canales RC -> delta PWM [us] por servo, con trim del transmisor */
-     float servo_cmd_us[SERVO_SIM_N_SERVOS];
-     rc_to_servo_cmds_us(&rc_sim, g_trim_us, servo_cmd_us);
-
      /* Opcional: flaps, modo, armado */
      float flaps_cmd    = rc_sim.s[RC_CH_FLAPS];
      int mode_cmd       = (int)rc_sim.s[RC_CH_MODE];
      bool arm_cmd       = (rc_sim.s[RC_CH_ARM] > 0.5f);
-     (void)flaps_cmd; (void)mode_cmd; (void)arm_cmd;  // reservados para flight_management (v0.3)
+     (void)flaps_cmd;  // sin superficie de flaps en la planta
+
+     /* Flight management: sticks -> comandos de superficie. En MANUAL pasan
+        sin cambios; el modo pedido se ignora si aún no está implementado.
+        Corre a 1 ms para no meter retardo entre el piloto y los servos. */
+     FM_SetArmed(arm_cmd);
+     FM_SetMode((FM_Mode)mode_cmd);
+     const FM_CommandsNorm fm_in = {
+         .roll_norm  = rc_sim.s[RC_CH_ROLL],
+         .pitch_norm = rc_sim.s[RC_CH_PITCH],
+         .yaw_norm   = rc_sim.s[RC_CH_YAW],
+         .throttle   = rc_sim.s[RC_CH_THROTTLE],
+     };
+     const FM_State fm_st = {0};   // sin AHRS todavía: valid = false
+     FM_Update(&fm_in, &fm_st, dt_s);
+
+     FM_CommandsNorm fm_out;
+     FM_GetCmdOut(&fm_out);
+     SimRc_s rc_fm = rc_sim;
+     rc_fm.s[RC_CH_ROLL]     = fm_out.roll_norm;
+     rc_fm.s[RC_CH_PITCH]    = fm_out.pitch_norm;
+     rc_fm.s[RC_CH_YAW]      = fm_out.yaw_norm;
+     rc_fm.s[RC_CH_THROTTLE] = fm_out.throttle;
+
+     /* Canales -> delta PWM [us] por servo, con trim del transmisor */
+     float servo_cmd_us[SERVO_SIM_N_SERVOS];
+     rc_to_servo_cmds_us(&rc_fm, g_trim_us, servo_cmd_us);
 
      /* Enviar comandos a los servos/actuadores */
      for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
@@ -342,8 +372,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.0f,%.0f,"             // mode, arm
                     "%.6f,%.6f,%.6f,%.6f,"  // du, dw, dq, dtheta
                     "%.6f,%.6f,%.6f,%.6f,%.6f,"  // IAS, TAS, Δp, AoA, SideSlip
-                    "%.3f,%.3f,%.3f,"       // giros
-                    "%.3f,%.3f,%.3f,"       // acelerometros
+                    "%.6f,%.6f,%.6f,"       // giros [rad/s] (ruido sigma 0.002)
+                    "%.6f,%.6f,%.6f,"       // acelerometros [m/s^2]
                     "%.7f,%.7f,%.3f,"       // gps lat, lon [deg] (1e-7 deg ~ 1 cm), alt
                     "%.3f,%.3f,%.3f,"       // gps vn ve vd
                     "%.6f,"                 // Laser

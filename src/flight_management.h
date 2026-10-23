@@ -143,6 +143,7 @@ typedef struct
     bool failsafe_active;
 
     FM_CommandsNorm cmd_in;
+    FM_CommandsNorm cmd_out;    // comandos hacia los servos (mismas unidades que cmd_in)
     FM_Setpoints    sp;
     FM_Actuators    act_out;
 
@@ -166,6 +167,8 @@ typedef struct
  * ========================= */
 void FM_Init(const FM_Config *cfg, FM_Mode initial_mode);
 
+/* Solo acepta modos implementados (por ahora FM_MODE_MANUAL); un modo no
+   implementado o fuera de rango se ignora y el modo actual se mantiene. */
 void    FM_SetMode(FM_Mode mode);
 FM_Mode FM_GetMode(void);
 
@@ -183,6 +186,11 @@ void FM_ResetIntegrators(void);
 void FM_Update(const FM_CommandsNorm *rc_cmd,
                const FM_State        *st,
                float                  dt_s);
+
+/* Comandos de salida normalizados (misma escala que FM_CommandsNorm de
+   entrada): el ruteo a servos (signo del timón, trim, us) sigue fuera, en
+   rc_to_servo_cmds_us. En MANUAL salida == entrada, bit a bit. */
+void FM_GetCmdOut(FM_CommandsNorm *out);
 
 void FM_GetActuators(FM_Actuators *out);
 void FM_GetStatus(FM_Status *out);
