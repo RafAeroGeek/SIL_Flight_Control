@@ -180,9 +180,8 @@ columnas del pitot (`pitot_ms`, `tas_ms`, `dp_pa`: V = √(u²+v²+w²) incluye 
 v a segundo orden). Cada sensor tiene su propia secuencia de ruido, así que agregar o
 quitar ruido en uno no cambia las columnas de los demás.
 
-La línea base vigente es `2220e20` (pitot con Δp e ISA, ruido de veleta,
-secuencia de ruido por sensor); las anteriores (`e041d25`, `5ea17b6`, …) ya no
-aplican.
+La línea base vigente es `b48585b` (giros y acelerómetros con 6 decimales);
+las anteriores (`cf639a6`, `2220e20`, …) ya no aplican.
 
 ## Documentación teórica (`docs/teoria/`)
 
