@@ -373,6 +373,20 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
         return;
     }
 
+    /*
+     * La IMU muestrea a 200 Hz y retiene la salida entre muestras. La primera
+     * llamada muestrea de inmediato. La tolerancia absorbe el redondeo de dt_s.
+     */
+    if (ss->data.imu.valid) {
+        ss->imu_accum_s += dt_s;
+
+        if (ss->imu_accum_s < SENSORS_SIM_IMU_DT_S - 1.0e-6) {
+            return;
+        }
+
+        ss->imu_accum_s -= SENSORS_SIM_IMU_DT_S;
+    }
+
     double u = sensors_get_u_body_ms(sim);
     double w = sensors_get_w_body_ms(sim);
     double q = sensors_get_q_radps(sim);
@@ -420,27 +434,31 @@ static void SensorsSim_UpdateImu(SensorsSim *ss,
     gy += ss->cfg.noise.gyro_bias_y_radps;
     gz += ss->cfg.noise.gyro_bias_z_radps;
 
-    gx += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
-    gy += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
-    gz += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.gyro_noise_std_radps);
-
     ax += ss->cfg.noise.accel_bias_x_mps2;
     ay += ss->cfg.noise.accel_bias_y_mps2;
     az += ss->cfg.noise.accel_bias_z_mps2;
 
-    ax += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
-    ay += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
-    az += sensors_noise(ss, SENSORS_RNG_IMU, ss->cfg.noise.accel_noise_std_mps2);
+    /* Teoría: docs/teoria/sensores/ruido_sensores.tex */
+    const double verdad[IMU_N] = { gx, gy, gz, ax, ay, az };
+    double y[IMU_N];
+
+    if (ss->cfg.noise.enable_noise) {
+        imu_step(&ss->imu, verdad, y,
+                 ss->cfg.noise.imu_flight ? 1 : 0,
+                 ss->cfg.noise.imu_vib_env);
+    } else {
+        memcpy(y, verdad, sizeof(y));
+    }
 
     ss->data.imu.valid = true;
 
-    ss->data.imu.gyro_radps.x = gx;
-    ss->data.imu.gyro_radps.y = gy;
-    ss->data.imu.gyro_radps.z = gz;
+    ss->data.imu.gyro_radps.x = y[0];
+    ss->data.imu.gyro_radps.y = y[1];
+    ss->data.imu.gyro_radps.z = y[2];
 
-    ss->data.imu.accel_mps2.x = ax;
-    ss->data.imu.accel_mps2.y = ay;
-    ss->data.imu.accel_mps2.z = az;
+    ss->data.imu.accel_mps2.x = y[3];
+    ss->data.imu.accel_mps2.y = y[4];
+    ss->data.imu.accel_mps2.z = y[5];
 
     ss->data.imu.theta_rad = theta;
 }
@@ -536,6 +554,19 @@ void SensorsSim_Init(SensorsSim *ss,
     for (uint32_t k = 0u; k < (uint32_t)SENSORS_RNG_N; ++k) {
         ss->rng_state[k] = sensors_seed_stream(cfg->random_seed, k);
     }
+
+    /*
+     * La IMU usa el generador de su modelo: consume 31 normales por muestra y
+     * los 24 bits bajos de la LCG repiten su secuencia cada 2^24 valores.
+     */
+    imu_init(&ss->imu,
+             (cfg->noise.imu_profile == IMU_PROFILE_IDLE) ? IMU_PROFILE_IDLE : IMU_PROFILE_FLOOR,
+             SENSORS_SIM_IMU_DT_S,
+             sensors_seed_stream(cfg->random_seed, (uint32_t)SENSORS_RNG_IMU));
+    ss->imu.noise_scale = cfg->noise.imu_noise_scale;
+    ss->imu.white_scale = cfg->noise.imu_white_scale;
+    ss->imu.vib_scale   = cfg->noise.imu_vib_scale;
+    ss->imu.bias_scale  = cfg->noise.imu_bias_scale;
 
     ss->prev_u_ms = sensors_get_u_body_ms(sim);
     ss->prev_w_ms = sensors_get_w_body_ms(sim);
