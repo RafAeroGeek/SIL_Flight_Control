@@ -164,6 +164,12 @@ if(SIL_BUILD_TESTS)
     target_link_libraries(test_sensors PRIVATE m)
     add_test(NAME test_sensors COMMAND test_sensors)
 
+    # Herramienta de validación espectral del ruido de IMU (no es un test de ctest)
+    add_executable(imu_test test/imu_test.c)
+    target_include_directories(imu_test PRIVATE src)
+    target_compile_options(imu_test PRIVATE -Wall)
+    target_link_libraries(imu_test PRIVATE m)
+
     add_executable(test_flight_management
         test/test_flight_management.c
         src/flight_management.c
