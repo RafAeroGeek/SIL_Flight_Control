@@ -6,7 +6,7 @@ independiente por tema; todos comparten `comun/preambulo.tex`.
 
 | Tema | Documento | Código que describe |
 |---|---|---|
-| Ruido de sensores: pitot, veleta, ISA, generador de ruido | `sensores/ruido_sensores.tex` | `src/sensors_sim.c`, `src/atmosphere.c` |
+| Ruido de sensores: pitot, veleta, IMU, ISA, generador de ruido | `sensores/ruido_sensores.tex` (ajuste de la IMU en `sensores/imu_noise/`) | `src/sensors_sim.c`, `src/imu_sensor.h`, `src/atmosphere.c` |
 | Control lateral: yaw damper, alabeo y rumbo (diseño) | `control/control_lateral.tex` | `dynamics/control_lat_design.py` (F2); `src/flight_management.c` (F3–F6) |
 
 Próximos: dinámica longitudinal y lateral-direccional del Ugly Stick

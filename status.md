@@ -10,19 +10,21 @@
 ## 1. Estado actual
 
 ### Git
+- Ramas locales sin push: `docs/plan-ruido-imu` (plan) y, encima de ella,
+  `feat/imu-ruido` (F3a+ implementada, sin PR).
 - `main` al día con `origin/main`; PRs #1–#22 mergeados (el #19 entró en
   `feat/dpsi` y llegó a `main` con el #21). Sin ramas abiertas.
 
-### Build y tests (verificado 2026-10-26)
+### Build y tests (verificado 2026-11-02 en `feat/imu-ruido`)
 - Compila con **0 warnings** `-Wall`.
 - **ctest: 11/11** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
   `test_aircraft_loader_lat`, `test_lateral_matrices`,
   `test_pilot_lateral_servo`, `test_lon_matrices`, `test_flight_sim_trim`,
   `test_atmosphere`, `test_sensors`, `test_flight_management`).
 - **pytest: 73/73** en `main` (`dynamics/` 24 + `flightreview/` 49).
-- Línea base de regresión vigente: `data/baseline_b48585b.csv` (local, no
-  trackeada; giros y acelerómetros con 6 decimales). Frente a `cf639a6` solo
-  cambian esos 6 canales (≤ 5e-4, redondeo). Las anteriores ya no aplican.
+- Línea base de regresión en `main`: `data/baseline_b48585b.csv` (local, no
+  trackeada). En `feat/imu-ruido`: `data/baseline_2632b23.csv`; solo cambian los
+  6 canales de la IMU. Se vuelve la vigente al entrar a `main`.
 - Documentación teórica en `docs/teoria/` (LaTeX):
   `sensores/ruido_sensores.tex` y `control/control_lateral.tex`.
 
@@ -54,6 +56,9 @@
     rumbo sin sobrepaso; el modo rumbo exige el yaw damper.
   - `flight_management` con modo MANUAL (paso directo, bit a bit); giros y
     acelerómetros del CSV con 6 decimales.
+- **En `feat/imu-ruido` (sin PR):** ruido de IMU ajustado al log de vuelo, a
+  200 Hz con retención y `m = 1`; `imu_sensor.h`, `imu_test` y 6 tests más en
+  `test_sensors`.
 
 ### Modos del Ugly Stick (estimación teórica)
 | Modo | λ | ωn [rad/s] | ζ |
@@ -69,11 +74,6 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 ---
 
 ## 2. Pendientes (consolidado de TODO.md + código)
-
-### Alta prioridad
-| # | Pendiente |
-|---|---|
-| 4.2 | Ruido de IMU desde vuelos de prueba: el SIL usa σ 0.002 rad/s y 0.05 m/s², y en vuelo lo medido es 11–42 y 11–26 veces mayor → F3a+ |
 
 ### Media prioridad
 | # | Pendiente |
@@ -114,7 +114,7 @@ inserta algo antes de seguir.
 | F1 ✅ | `dpsi` como 5º estado: lateral 5x5 (ψ̇ = r·sec θ0), GPS con rumbo, columna `dpsi_rad` |
 | F2 ✅ | Diseño de ganancias en Python (clásico en cascada, ζ_DR ≥ 0.4, espiral estable) + `docs/teoria/control/control_lateral.tex` |
 | F3a ✅ | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) — #20 |
-| F3a+ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto |
+| F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto (rama local, sin PR) |
 | F3b | AHRS ideal con ruido + adaptar `FM_Config` (rumbo por alabeo, no por r_cmd); los giros de `FM_State` ya traen vibración |
 | F4 | Yaw damper; decidir aquí el filtro de giros (`p`: 0.085 rad/s RMS a 11–18 Hz; el log parece ya filtrado por ArduPilot) |
 | F5 | Modo estabilizado: wing leveler, stick → φ_cmd |

@@ -55,7 +55,13 @@
   TAS (columnas `pitot_ms` = IAS, `tas_ms`, `dp_pa`). Tests `test_atmosphere`
   y `test_sensors`. Teoría en `docs/teoria/sensores/ruido_sensores.tex`.
 
-### 4.2 Ruido de IMU desde vuelos de prueba
+### 4.2 Ruido de IMU desde vuelos de prueba ✅
+- **Hecho (2026-11-02):** rama local `feat/imu-ruido`, sin PR todavía. Frente a
+  `b48585b` solo cambian las 6 columnas de la IMU; línea base `2632b23`.
+  Validación espectral con `m = 1` (6×600 s): error mediano 1.7 %, máximo 26 %.
+  Con la envolvente aleatoria hacen falta más corridas: 6×600 s dio máximo 39 %
+  y 40×600 s, 29 %. El RMS medido del reporte no cuadra con su propia PSD en GyrY
+  y AccZ, y de ahí sale el error máximo.
 - **Task:** Reemplazar el ruido blanco arbitrario de giros y acelerómetros
   (σ 0.002 rad/s y 0.05 m/s²) por el modelo ajustado al log de vuelo de
   `docs/teoria/sensores/imu_noise/` (`Reporte_Ruido_IMU.md`). En vuelo el ruido
@@ -80,7 +86,8 @@
     encima. Con `enable_noise = false` no se llama a `imu_step`.
 - **Pasos:**
   1. docs: versionar `Reporte_Ruido_IMU.md`, el JSON, `imu_noise_model.py`,
-     `imu_export_c.py` y los 2 PNG únicos; ignorar el `.zip` y el PNG duplicado.
+     `imu_export_c.py` y los 2 PNG únicos; ignorar el `.zip`, el PNG duplicado y
+     las copias del C.
   2. Modelo: `src/imu_params.h` (generado) y `src/imu_sensor.h`, header-only.
      `imu_sensor.h` no compila tal cual: usa `M_PI` y el proyecto compila con
      `-std=c11` sin extensiones; cambiarlo por una constante local.
@@ -104,7 +111,7 @@
   - Misma semilla, misma salida; encender la IMU no mueve ni un bit de Δp.
   - `test/compare_csv_cols.py` contra `data/baseline_b48585b.csv`: solo cambian
     `gyro_{x,y,z}_radps` y `acc_{x,y,z}_mps2`. Después, guardar línea base nueva.
-  - Validación espectral única: 600 s con `imu_test.c`, submuestreados a 50 Hz,
+  - Validación espectral única: `test/imu_test.c`, submuestreado a 50 Hz,
     contra la tabla 8.3 del reporte (RMS > 5 Hz y PSD 5–12 / 12–24 Hz, error
     máximo ≈ 30 %). Registrarla en el `.tex`.
 - **Límites conocidos:**
