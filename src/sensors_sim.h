@@ -67,14 +67,12 @@ typedef struct
     double vane_alpha_bias_deg;
     double vane_beta_bias_deg;
 
-    /* Gyros */
-    double gyro_noise_std_radps;
+    /* Gyros: sesgo determinista; el ruido viene del modelo de IMU */
     double gyro_bias_x_radps;
     double gyro_bias_y_radps;
     double gyro_bias_z_radps;
 
-    /* Acelerómetros */
-    double accel_noise_std_mps2;
+    /* Acelerómetros: sesgo determinista */
     double accel_bias_x_mps2;
     double accel_bias_y_mps2;
     double accel_bias_z_mps2;
