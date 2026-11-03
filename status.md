@@ -1,7 +1,7 @@
 # Status del proyecto — SIL_Flight_Control
 
 **Fecha de revisión:** 2026-11-02
-**Último commit en `main`:** `e29c36c` Merge PR #22 (status con F2 y línea base)
+**Último commit en `main`:** `f67e628` Merge PR #23 (ruido de IMU desde vuelos de prueba)
 **Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`), `v0.3-dynamics` (2026-10-22, `717c056`)
 **Versión en `CMakeLists.txt`:** 0.3.0
 
@@ -10,20 +10,19 @@
 ## 1. Estado actual
 
 ### Git
-- `feat/imu-ruido`: F3a+ implementada, en PR hacia `main`.
-- `main` al día con `origin/main`; PRs #1–#22 mergeados (el #19 entró en
+- `main` al día con `origin/main`; PRs #1–#23 mergeados (el #19 entró en
   `feat/dpsi` y llegó a `main` con el #21). Sin ramas abiertas.
 
-### Build y tests (verificado 2026-11-02 en `feat/imu-ruido`)
+### Build y tests (verificado 2026-11-02)
 - Compila con **0 warnings** `-Wall`.
 - **ctest: 11/11** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
   `test_aircraft_loader_lat`, `test_lateral_matrices`,
   `test_pilot_lateral_servo`, `test_lon_matrices`, `test_flight_sim_trim`,
   `test_atmosphere`, `test_sensors`, `test_flight_management`).
 - **pytest: 73/73** en `main` (`dynamics/` 24 + `flightreview/` 49).
-- Línea base de regresión en `main`: `data/baseline_b48585b.csv` (local, no
-  trackeada). En `feat/imu-ruido`: `data/baseline_2632b23.csv`; solo cambian los
-  6 canales de la IMU. Se vuelve la vigente al entrar a `main`.
+- Línea base de regresión vigente: `data/baseline_2632b23.csv` (local, no
+  trackeada). Frente a `b48585b` solo cambian los 6 canales de la IMU. Las
+  anteriores ya no aplican.
 - Documentación teórica en `docs/teoria/` (LaTeX):
   `sensores/ruido_sensores.tex` y `control/control_lateral.tex`.
 
@@ -55,7 +54,7 @@
     rumbo sin sobrepaso; el modo rumbo exige el yaw damper.
   - `flight_management` con modo MANUAL (paso directo, bit a bit); giros y
     acelerómetros del CSV con 6 decimales.
-- **En `feat/imu-ruido`:** ruido de IMU ajustado al log de vuelo, a
+- **F3a+ (PR #23):** ruido de IMU ajustado al log de vuelo, a
   200 Hz con retención y `m = 1`; `imu_sensor.h`, `imu_test` y 6 tests más en
   `test_sensors`.
 
@@ -113,7 +112,7 @@ inserta algo antes de seguir.
 | F1 ✅ | `dpsi` como 5º estado: lateral 5x5 (ψ̇ = r·sec θ0), GPS con rumbo, columna `dpsi_rad` |
 | F2 ✅ | Diseño de ganancias en Python (clásico en cascada, ζ_DR ≥ 0.4, espiral estable) + `docs/teoria/control/control_lateral.tex` |
 | F3a ✅ | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) — #20 |
-| F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto |
+| F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto — #23 |
 | F3b | AHRS ideal con ruido + adaptar `FM_Config` (rumbo por alabeo, no por r_cmd); los giros de `FM_State` ya traen vibración |
 | F4 | Yaw damper; decidir aquí el filtro de giros (`p`: 0.085 rad/s RMS a 11–18 Hz; el log parece ya filtrado por ArduPilot) |
 | F5 | Modo estabilizado: wing leveler, stick → φ_cmd |
