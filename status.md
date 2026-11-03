@@ -10,8 +10,7 @@
 ## 1. Estado actual
 
 ### Git
-- Ramas locales sin push: `docs/plan-ruido-imu` (plan) y, encima de ella,
-  `feat/imu-ruido` (F3a+ implementada, sin PR).
+- `feat/imu-ruido`: F3a+ implementada, en PR hacia `main`.
 - `main` al día con `origin/main`; PRs #1–#22 mergeados (el #19 entró en
   `feat/dpsi` y llegó a `main` con el #21). Sin ramas abiertas.
 
@@ -56,7 +55,7 @@
     rumbo sin sobrepaso; el modo rumbo exige el yaw damper.
   - `flight_management` con modo MANUAL (paso directo, bit a bit); giros y
     acelerómetros del CSV con 6 decimales.
-- **En `feat/imu-ruido` (sin PR):** ruido de IMU ajustado al log de vuelo, a
+- **En `feat/imu-ruido`:** ruido de IMU ajustado al log de vuelo, a
   200 Hz con retención y `m = 1`; `imu_sensor.h`, `imu_test` y 6 tests más en
   `test_sensors`.
 
@@ -114,7 +113,7 @@ inserta algo antes de seguir.
 | F1 ✅ | `dpsi` como 5º estado: lateral 5x5 (ψ̇ = r·sec θ0), GPS con rumbo, columna `dpsi_rad` |
 | F2 ✅ | Diseño de ganancias en Python (clásico en cascada, ζ_DR ≥ 0.4, espiral estable) + `docs/teoria/control/control_lateral.tex` |
 | F3a ✅ | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) — #20 |
-| F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto (rama local, sin PR) |
+| F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto |
 | F3b | AHRS ideal con ruido + adaptar `FM_Config` (rumbo por alabeo, no por r_cmd); los giros de `FM_State` ya traen vibración |
 | F4 | Yaw damper; decidir aquí el filtro de giros (`p`: 0.085 rad/s RMS a 11–18 Hz; el log parece ya filtrado por ArduPilot) |
 | F5 | Modo estabilizado: wing leveler, stick → φ_cmd |

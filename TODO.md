@@ -56,7 +56,7 @@
   y `test_sensors`. Teoría en `docs/teoria/sensores/ruido_sensores.tex`.
 
 ### 4.2 Ruido de IMU desde vuelos de prueba ✅
-- **Hecho (2026-11-02):** rama local `feat/imu-ruido`, sin PR todavía. Frente a
+- **Hecho (2026-11-02):** rama `feat/imu-ruido`. Frente a
   `b48585b` solo cambian las 6 columnas de la IMU; línea base `2632b23`.
   Validación espectral con `m = 1` (6×600 s): error mediano 1.7 %, máximo 26 %.
   Con la envolvente aleatoria hacen falta más corridas: 6×600 s dio máximo 39 %
