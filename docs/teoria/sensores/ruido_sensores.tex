@@ -58,8 +58,9 @@ Número de Mach $M$     & 0.0751                  & $a = \SI{336.4}{m/s}$ \\
 \end{tabular}
 \end{center}
 
-Todos los sensores se actualizan cada paso del simulador, $\Delta t = \SI{1}{ms}$
-(\SI{1}{kHz}), dentro de \func{SensorsSim\_Update}.
+Los sensores se actualizan cada paso del simulador, $\Delta t = \SI{1}{ms}$
+(\SI{1}{kHz}), dentro de \func{SensorsSim\_Update}. La excepción es la IMU, que
+muestrea a \SI{200}{Hz} (sección~\ref{sec:imu}).
 
 % ============================================================
 \section{Modelo general de medición y generador de ruido}
@@ -133,7 +134,7 @@ Secuencia & Sensor & Muestras por paso \\
 \midrule
 \texttt{SENSORS\_RNG\_PITOT} & pitot ($\dpm$)                     & 1 \\
 \texttt{SENSORS\_RNG\_VANE}  & veleta ($\alpha$, $\beta$)         & 2 \\
-\texttt{SENSORS\_RNG\_IMU}   & giróscopos y acelerómetros         & 6 \\
+\texttt{SENSORS\_RNG\_IMU}   & semilla de la IMU (sec.~\ref{sec:imu}) & --- \\
 \texttt{SENSORS\_RNG\_GPS}   & posición y velocidad GPS           & 6 \\
 \texttt{SENSORS\_RNG\_LASER} & altímetro láser                    & 1 \\
 \bottomrule
@@ -434,6 +435,133 @@ generador cambiaba la línea base de todos los sensores; la
 sección~\ref{sec:ruido} resolvió eso.
 
 % ============================================================
+\section{IMU: giróscopos y acelerómetros}
+\label{sec:imu}
+% ============================================================
+
+El ruido de la IMU viene de un log de vuelo real del Ugly Stick con ArduPilot.
+El análisis completo, con la validación y las limitaciones, está en
+\archivo{imu\_noise/Reporte\_Ruido\_IMU.md}. Aquí se resume lo que implementa
+\archivo{src/imu\_sensor.h}, con los parámetros de \archivo{src/imu\_params.h}
+(generado desde el JSON del ajuste con \archivo{imu\_export\_c.py}).
+
+\subsection{Magnitud verdadera}
+
+Los giróscopos miden $(p,q,r)$. Los acelerómetros miden fuerza específica en ejes
+cuerpo, con $z$ hacia abajo, de modo que en reposo $a_z \approx -g$. Las
+derivadas se aproximan por diferencia finita sobre el último paso.
+
+\subsection{Modelo de ruido}
+
+Por canal $j$, en cada muestra $n$ con $\Delta t_I = \SI{5}{ms}$:
+\begin{equation}
+  y[n] = u[n] + b_0 + w[n] + c[n] + m\,\bigl(\sigma_f\,\eta[n] + x_1[n] + x_2[n]\bigr).
+  \label{eq:imu}
+\end{equation}
+Todas las entradas son normales independientes $\Normal(0,1)$:
+\begin{itemize}
+  \item \textbf{Sesgo} $b_0 \sim \Normal(0,\sigma_b^2)$, fijo en cada corrida. El
+        de los acelerómetros, \SI{0.05}{m/s^2}, es un supuesto: no se puede
+        identificar con este log.
+  \item \textbf{Blanco} $w[n] = \sigma_w\,\xi[n]$.
+  \item \textbf{Correlacionado} (Ornstein-Uhlenbeck, solo GyrX y GyrZ en el
+        perfil de piso), con $\phi = e^{-\Delta t_I/\tau_c}$:
+        \begin{equation}
+          c[n] = \phi\,c[n-1] + \sigma_c\sqrt{1-\phi^2}\;\xi'[n].
+        \end{equation}
+  \item \textbf{Vibración}: un término plano $\sigma_f\eta[n]$ más dos
+        resonadores AR(2), con $r = e^{-\pi (f_0/Q)\Delta t_I}$ y
+        $\theta = 2\pi f_0\Delta t_I$:
+        \begin{align}
+          x[n] &= a_1 x[n-1] + a_2 x[n-2] + g\,\zeta[n],
+                  \qquad a_1 = 2r\cos\theta,\quad a_2 = -r^2,\\
+          g &= \sigma_x \sqrt{\frac{(1+a_2)\bigl((1-a_2)^2 - a_1^2\bigr)}{1-a_2}},
+        \end{align}
+        donde $g$ se elige para que la varianza estacionaria de $x$ sea
+        $\sigma_x^2$.
+\end{itemize}
+
+\paragraph{Envolvente $m$.} El simulador usa $m = 1$ por defecto
+(\clave{imu\_vib\_env}), que da exactamente el RMS medido en vuelo. Con
+\clave{imu\_vib\_env} $< 0$ se activa la envolvente log-normal del reporte, común a
+los seis canales:
+\begin{equation}
+  m[n] = e^{s\,h[n] - s^2},\qquad
+  h[n] = \phi_m h[n-1] + \sqrt{1-\phi_m^2}\;\xi''[n],\qquad
+  \E[m^2] = 1,
+\end{equation}
+con $s = 0.84$ y $\phi_m = e^{-\Delta t_I/\tau_m}$, $\tau_m = \SI{14}{s}$. Como
+$\tau_m$ es mayor que una corrida típica, en \SI{10}{s} el nivel depende de la
+semilla: $\sqrt{\overline{m^2}}$ va de 0.16 a 2.09 (percentiles 5 y 95), y en
+\SI{600}{s} de 0.67 a 1.44. La mediana de $m$ es 0.50, así que $m=1$ es el RMS,
+no el nivel más frecuente.
+
+\subsection{Niveles}
+
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+Canal & $\sqrt{\sigma_w^2+\sigma_c^2}$ (piso) & $\sigma$ vibración ($m=1$)
+      & Dos picos [\si{Hz}] & Unidad \\
+\midrule
+GyrX & \num{9.68e-4} & \num{8.46e-2} & 11.4, 18.2 & \si{rad/s} \\
+GyrY & \num{4.54e-4} & \num{3.57e-2} & 15.7, 16.7 & \si{rad/s} \\
+GyrZ & \num{4.79e-4} & \num{2.29e-2} & 12.2, 18.8 & \si{rad/s} \\
+AccX & \num{6.59e-3} & 0.555         & 11.7, 18.1 & \si{m/s^2} \\
+AccY & \num{1.79e-2} & 1.17          & 11.9, 18.5 & \si{m/s^2} \\
+AccZ & \num{7.05e-3} & 1.32          & 11.0, 17.5 & \si{m/s^2} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Antes el simulador usaba $\sigma = \SI{0.002}{rad/s}$ y \SI{0.05}{m/s^2}, entre 11 y
+42 veces menos que lo medido en vuelo. El contenido del log por debajo de
+\SI{5}{Hz} es movimiento del avión y no se suma como ruido.
+
+\subsection{Tasa de muestreo}
+
+El modelo se validó a \SI{200}{Hz} y el simulador corre a \SI{1}{kHz}, así que la
+IMU muestrea cada \SI{5}{ms} (\texttt{SENSORS\_SIM\_IMU\_DT\_S}) y retiene la salida.
+La primera llamada muestrea de inmediato. El CSV a \SI{1}{kHz} repite cada valor
+cinco veces: para estimar espectros hay que quedarse con una fila de cada cinco.
+
+\subsection{Generador}
+
+La IMU usa el generador de su modelo, xoroshiro128+ con Box-Muller, y no el LCG de
+la sección~\ref{sec:ruido}: consume 31 normales por muestra, y el LCG repetiría su
+secuencia cada \SI{226}{s} porque solo usa sus 24 bits bajos, de periodo $2^{24}$.
+La semilla sigue saliendo de \func{sensors\_seed\_stream} con
+\texttt{SENSORS\_RNG\_IMU}, así que las demás secuencias no cambian.
+
+\subsection{Validación espectral}
+
+Con \archivo{test/imu\_test.c} a \SI{200}{Hz}, submuestreado a \SI{50}{Hz} y
+comparado con el log. Con $m=1$, 6 realizaciones de \SI{600}{s}:
+
+\begin{center}
+\begin{tabular}{lcc@{\hskip 1.5em}cc}
+\toprule
+Canal & RMS $>\SI{5}{Hz}$ medido & simulado & PSD 5--12 Hz & PSD 12--24 Hz \\
+\midrule
+GyrX & 0.0794 & 0.0809 (+2\%)  & $-1$\%  & $-3$\% \\
+GyrY & 0.0266 & 0.0334 (+26\%) & $-1$\%  & $-1$\% \\
+GyrZ & 0.0205 & 0.0216 (+5\%)  & $-1$\%  & $-1$\% \\
+AccX & 0.475  & 0.519 (+9\%)   & $-19$\% & 0\%    \\
+AccY & 1.169  & 1.115 ($-5$\%) & $-2$\%  & $-3$\% \\
+AccZ & 1.026  & 1.205 (+17\%)  & $-2$\%  & 0\%    \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La mediana del error es 1.7\% y el máximo 26\%. Los errores de RMS en GyrY y AccZ no
+se ven en las PSD: el RMS medido del reporte no cuadra con la raíz de su propia PSD
+por bandas (GyrY: 0.0266 frente a 0.0331; AccZ: 1.03 frente a 1.19). Con la
+envolvente aleatoria, 40 realizaciones de \SI{600}{s} dan mediana 5.1\% y máximo
+29\%. Seis realizaciones no bastan en ese caso: una primera prueba dio máximo 39\%,
+con casi todas las PSD desplazadas cerca de 20\% a la vez. Es una validación dentro de la muestra,
+porque los mismos datos ajustaron el modelo.
+
+% ============================================================
 \section{Resumen de parámetros}
 % ============================================================
 
@@ -450,10 +578,14 @@ Veleta & \clave{vane\_noise\_std\_deg}     & 0.5   & \si{\degree} \\
        & \clave{vane\_alpha\_bias\_deg}    & 0     & \si{\degree} \\
        & \clave{vane\_beta\_bias\_deg}     & 0     & \si{\degree} \\
 \midrule
+IMU    & \clave{imu\_profile}              & floor & --- \\
+       & \clave{imu\_flight}               & true  & --- \\
+       & \clave{imu\_vib\_env}             & 1     & --- \\
+       & \clave{imu\_noise\_scale}, \clave{imu\_white\_scale} & 1 & --- \\
+       & \clave{imu\_vib\_scale}, \clave{imu\_bias\_scale}    & 1 & --- \\
+\midrule
 \multicolumn{4}{l}{\emph{Otros sensores (mismo modelo \eqref{eq:medicion}, no
 detallados aquí)}} \\
-Giróscopos     & \clave{gyro\_noise\_std\_radps}  & 0.002 & \si{rad/s} \\
-Acelerómetros  & \clave{accel\_noise\_std\_mps2}  & 0.05  & \si{m/s^2} \\
 GPS posición   & \clave{gps\_pos\_noise\_std\_m}  & 1.5   & \si{m} \\
 GPS velocidad  & \clave{gps\_vel\_noise\_std\_ms} & 0.10  & \si{m/s} \\
 GPS altitud    & \clave{gps\_alt\_noise\_std\_m}  & 2.0   & \si{m} \\
@@ -485,6 +617,12 @@ verdaderas más el sesgo.
     \item T4: veleta en trim ($\alpha = \alpha_0$, $\beta = 0$);
           $\hat\sigma_\alpha$ y $\hat\sigma_\beta$ dentro de 5\% de
           \SI{0.5}{\degree} y $|r_{\alpha\beta}| < 0.05$.
+    \item T5: IMU sin ruido: verdad en el trim más sesgo determinista.
+    \item T6 y T7: $\hat\sigma$ por canal dentro de 5\% del piso y dentro de
+          10\% de piso más vibración con $m=1$.
+    \item T8: retención durante \SI{5}{ms} y muestra nueva en el quinto paso.
+    \item T9 y T10: misma semilla, misma salida; encender la IMU no cambia
+          ni un bit de $\dpm$.
   \end{itemize}
 \end{itemize}
 
@@ -529,9 +667,17 @@ $\hat\sigma/\sqrt{1000}$.
   \item \textbf{Sin cuantización} del ADC ni deriva del sesgo (paseo aleatorio).
   \item \textbf{Valores de $\sigma$ por validar} con datos del sensor real
         (\clave{pitot\_dp\_noise\_std\_pa}, \clave{vane\_noise\_std\_deg}).
-  \item Los modelos de la IMU, el GPS y el láser usan el mismo esquema
-        \eqref{eq:medicion}; su teoría (fuerza específica, conversión
-        cuerpo--NED) queda para otra sección.
+  \item \textbf{IMU, un solo log}: \SI{55}{s} de piso y unos \SI{700}{s} de vuelo a
+        \SI{50}{Hz}. No se ve nada entre 25 y \SI{100}{Hz}, y los picos de
+        17--\SI{19}{Hz} podrían ser alias. La señal probablemente ya pasó por el
+        filtro de ArduPilot (inferencia por los nombres de columnas, por confirmar
+        en el \texttt{.bin}). \clave{imu\_white\_scale} casi no influye en vuelo,
+        porque $\sigma_w$ es mucho menor que la vibración.
+  \item \textbf{IMU, sin modelar}: escala, desalineación, cuantización, temperatura
+        y correlación entre GyrX y GyrZ ($\rho\approx 0.5$ en reposo).
+  \item Los modelos del GPS y el láser usan el mismo esquema
+        \eqref{eq:medicion}; su teoría (conversión cuerpo--NED) queda para otra
+        sección.
 \end{itemize}
 
 % ============================================================

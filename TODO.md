@@ -2,7 +2,7 @@
 ## Fase 2: Lateral-Directional Dynamics Integration
 
 **Generado:** 2026-09-09  
-**Actualizado:** 2026-10-20 (cierre de v0.2-lateral)  
+**Actualizado:** 2026-11-02 (plan de ruido de IMU, 4.2–4.6)  
 **Estatus:** Dinámica lateral-direccional lineal integrada (placeholders Navion)
 
 ---
@@ -54,6 +54,99 @@
   (`src/atmosphere.c`), ruido y bias en Δp [Pa] (σ = 5.6 Pa), salidas IAS y
   TAS (columnas `pitot_ms` = IAS, `tas_ms`, `dp_pa`). Tests `test_atmosphere`
   y `test_sensors`. Teoría en `docs/teoria/sensores/ruido_sensores.tex`.
+
+### 4.2 Ruido de IMU desde vuelos de prueba ✅
+- **Hecho (2026-11-02):** rama `feat/imu-ruido`. Frente a
+  `b48585b` solo cambian las 6 columnas de la IMU; línea base `2632b23`.
+  Validación espectral con `m = 1` (6×600 s): error mediano 1.7 %, máximo 26 %.
+  Con la envolvente aleatoria hacen falta más corridas: 6×600 s dio máximo 39 %
+  y 40×600 s, 29 %. El RMS medido del reporte no cuadra con su propia PSD en GyrY
+  y AccZ, y de ahí sale el error máximo.
+- **Task:** Reemplazar el ruido blanco arbitrario de giros y acelerómetros
+  (σ 0.002 rad/s y 0.05 m/s²) por el modelo ajustado al log de vuelo de
+  `docs/teoria/sensores/imu_noise/` (`Reporte_Ruido_IMU.md`). En vuelo el ruido
+  real es 11–42 veces el actual en giros y 11–26 veces en acelerómetros.
+- **Priority:** HIGH (antes de F3b: el control va a realimentar estos giros)
+- **Rama:** `feat/imu-ruido`, commits atómicos
+- **Modelo (por canal):**
+  `y = u + b0 + (blanco + OU + m·(plano + 2 AR(2)))`, entradas gaussianas.
+- **Decisiones (2026-11-02):**
+  - Modelo completo, perfil `floor` con `flight = 1` siempre (el SIL arranca en
+    vuelo y no tiene fase de tierra).
+  - IMU a 200 Hz con retención (validada a esa tasa); el resto del SIL a 1 kHz.
+  - Envolvente `m = 1` fija por defecto: en 10 s la envolvente aleatoria da
+    0.16×–2.09× de RMS según la semilla (P5–P95). Con `imu_vib_env < 0` se activa
+    para corridas largas.
+  - Log tomado como Ugly Stick con ArduPilot: la vibración es dato del avión.
+  - La IMU usa xoroshiro128+ y Box-Muller del reporte, no la LCG (ver 4.4).
+    Semilla: `sensors_seed_stream(seed, SENSORS_RNG_IMU)`; el enum no cambia para
+    que los demás sensores conserven sus secuencias.
+  - Sesgo `b0` aleatorio por semilla con `bias_scale = 1` (el de acelerómetro,
+    0.05 m/s², es un supuesto del reporte). Los `*_bias_*` deterministas se suman
+    encima. Con `enable_noise = false` no se llama a `imu_step`.
+- **Pasos:**
+  1. docs: versionar `Reporte_Ruido_IMU.md`, el JSON, `imu_noise_model.py`,
+     `imu_export_c.py` y los 2 PNG únicos; ignorar el `.zip`, el PNG duplicado y
+     las copias del C.
+  2. Modelo: `src/imu_params.h` (generado) y `src/imu_sensor.h`, header-only.
+     `imu_sensor.h` no compila tal cual: usa `M_PI` y el proyecto compila con
+     `-std=c11` sin extensiones; cambiarlo por una constante local.
+  3. `src/sensors_sim.{h,c}`: quitar `gyro_noise_std_radps` y
+     `accel_noise_std_mps2`; agregar `imu_profile`, `imu_flight`, `imu_vib_env`,
+     `imu_{noise,white,vib,bias}_scale`, `ImuSensor imu` e `imu_accum_s`.
+     `SensorsSim_UpdateImu` conserva la verdad actual, llama a `imu_step` cada
+     5 ms y retiene la salida; la primera llamada dispara de inmediato.
+  4. `src/main.c`: configuración nueva y comentario "ruido sigma 0.002" del CSV.
+  5. Tests en `test/test_sensors.c`.
+  6. Docs: sección IMU en `ruido_sensores.tex`, tabla de parámetros y la frase
+     "todos los sensores se actualizan cada paso"; `README.md`,
+     `docs/teoria/README.md`; línea base nueva en `status.md`.
+- **Acceptance:**
+  - 0 warnings `-Wall`, ctest completo y `pytest flightreview dynamics` en verde.
+  - `enable_noise = false`: salida igual a la verdad.
+  - `floor` sin vuelo y `bias_scale = 0`: σ por canal ±5 % de √(σ_w²+σ_c²).
+  - `flight = 1`, `m = 1`: σ ±10 % del total (giro 0.085/0.036/0.023 rad/s,
+    acel 0.56/1.17/1.32 m/s²).
+  - Retención: valor constante durante 5 ms y nuevo en el 5.º paso.
+  - Misma semilla, misma salida; encender la IMU no mueve ni un bit de Δp.
+  - `test/compare_csv_cols.py` contra `data/baseline_b48585b.csv`: solo cambian
+    `gyro_{x,y,z}_radps` y `acc_{x,y,z}_mps2`. Después, guardar línea base nueva.
+  - Validación espectral única: `test/imu_test.c`, submuestreado a 50 Hz,
+    contra la tabla 8.3 del reporte (RMS > 5 Hz y PSD 5–12 / 12–24 Hz, error
+    máximo ≈ 30 %). Registrarla en el `.tex`.
+- **Límites conocidos:**
+  - `white_scale` casi no influye en vuelo (σ_w ~6e-4 rad/s frente a 0.085 de
+    vibración). La incertidumbre real es la vibración de 25–100 Hz, y ninguna
+    perilla la cubre.
+  - Sin filtro, el control recibe la vibración completa (`p`: 0.085 rad/s RMS a
+    11–18 Hz). El log parece venir ya filtrado por ArduPilot (inferencia por los
+    nombres de columnas), así que no suponer otro LPF igual sin revisarlo. Se
+    decide en F4.
+
+### 4.3 Datos del .bin de ArduPilot
+- **Task:** Del log original, si los tiene, sacar `INS_GYRO_FILTER` e
+  `INS_ACCEL_FILTER`, throttle (`RCOU`/`CTUN`) para ligar la envolvente a la
+  potencia y separar `floor` de `idle`, y RPM para descartar alias en 17–19 Hz.
+  Agregar `imu_noise_analysis.py` y `sensors_data.csv`, que faltan en
+  `imu_noise/` y hacen falta para reproducir el ajuste.
+- **Priority:** MEDIUM
+
+### 4.4 Periodo de la LCG
+- **Task:** `sensors_rand_uniform_0_1` usa los 24 bits bajos, con periodo 2²⁴:
+  a 6 normales por paso a 1 kHz (GPS, y la IMU actual) el ruido se repite cada
+  233 s. No afecta a corridas de 10 s. Usar los bits altos; cambia todas las
+  columnas con ruido, así que va aparte y con línea base nueva.
+- **Priority:** LOW
+
+### 4.5 Verdad del acelerómetro
+- **Task:** Agregar `-r·v` en `ax` y `+p·v` en `az`, y usar
+  `SENSORS_SIM_GRAVITY_MPS2` en lugar de 9.81 en `SensorsSim_UpdateImu`.
+- **Priority:** LOW
+
+### 4.6 IMU en flightreview
+- **Task:** Revisar los umbrales de vibración (3 y 6 m/s² sobre |a|, que ya
+  quedan superados por |a| ≈ 9.8) y agregar una gráfica de PSD de la IMU.
+- **Priority:** LOW
 
 ---
 
@@ -167,7 +260,9 @@
   factores son empíricos (`K_v`, `η_v`, el término `0.2·η·V_v·CLα_v` de Cnβ;
   `τ = √(S_e/S_ht)`, `η_ht`, `CL_u`, `CD_u`, `CM_u` en el longitudinal);
   no se modela el fuselaje (Cnβ, Cnr). Medir I_x/I_y/I_z con péndulo bifilar y
-  ajustar Cnr/Clβ y Cmq con datos de vuelo (respuesta a dobletes).
+  ajustar Cnr/Clβ y Cmq con datos de vuelo (respuesta a dobletes). La vibración
+  medida de la IMU ya tiene modelo (4.2); falta contrastarla con más vuelos, porque
+  la potencia media de un solo log tiene una incertidumbre del orden de ±50 %.
 - **Priority:** MEDIUM
 
 ### 8.13 Trim del elevador ✅

@@ -114,15 +114,23 @@ void task_init_1ms(void)
     scfg.noise.vane_alpha_bias_deg = 0.0;
     scfg.noise.vane_beta_bias_deg  = 0.0;
 
-    scfg.noise.gyro_noise_std_radps = 0.002;
     scfg.noise.gyro_bias_x_radps    = 0.0;
     scfg.noise.gyro_bias_y_radps    = 0.0;
     scfg.noise.gyro_bias_z_radps    = 0.0;
 
-    scfg.noise.accel_noise_std_mps2 = 0.05;
     scfg.noise.accel_bias_x_mps2    = 0.0;
     scfg.noise.accel_bias_y_mps2    = 0.0;
     scfg.noise.accel_bias_z_mps2    = 0.0;
+
+    /* IMU: modelo del log de vuelo, siempre en vuelo. Envolvente m = 1: cada
+       corrida tiene el RMS medido, sin depender de la semilla. */
+    scfg.noise.imu_profile     = IMU_PROFILE_FLOOR;
+    scfg.noise.imu_flight      = true;
+    scfg.noise.imu_vib_env     = 1.0;
+    scfg.noise.imu_noise_scale = 1.0;
+    scfg.noise.imu_white_scale = 1.0;
+    scfg.noise.imu_vib_scale   = 1.0;
+    scfg.noise.imu_bias_scale  = 1.0;
 
     scfg.noise.gps_pos_noise_std_m = 1.5;
     scfg.noise.gps_vel_noise_std_ms = 0.10;
@@ -372,7 +380,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.0f,%.0f,"             // mode, arm
                     "%.6f,%.6f,%.6f,%.6f,"  // du, dw, dq, dtheta
                     "%.6f,%.6f,%.6f,%.6f,%.6f,"  // IAS, TAS, Δp, AoA, SideSlip
-                    "%.6f,%.6f,%.6f,"       // giros [rad/s] (ruido sigma 0.002)
+                    "%.6f,%.6f,%.6f,"       // giros [rad/s]
                     "%.6f,%.6f,%.6f,"       // acelerometros [m/s^2]
                     "%.7f,%.7f,%.3f,"       // gps lat, lon [deg] (1e-7 deg ~ 1 cm), alt
                     "%.3f,%.3f,%.3f,"       // gps vn ve vd

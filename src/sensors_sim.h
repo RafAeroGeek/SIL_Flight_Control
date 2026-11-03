@@ -6,6 +6,7 @@
 
 #include "flight_sim.h"
 #include "dynamics.h"
+#include "imu_sensor.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,12 +23,16 @@ extern "C" {
 #define SENSORS_SIM_GRAVITY_MPS2      9.80665
 #define SENSORS_SIM_EARTH_RADIUS_M    6378137.0
 
+/* Periodo de la IMU: el modelo de ruido se validó a 200 Hz */
+#define SENSORS_SIM_IMU_DT_S          0.005
+
 /* ============================================================
  * Tipos auxiliares
  * ============================================================ */
 
 /* Una secuencia pseudoaleatoria por sensor: agregar o quitar ruido en uno
- * no desplaza la secuencia de los demás. */
+ * no desplaza la secuencia de los demás. SENSORS_RNG_IMU solo da la semilla
+ * del generador propio de la IMU. */
 typedef enum
 {
     SENSORS_RNG_PITOT = 0,
@@ -62,17 +67,25 @@ typedef struct
     double vane_alpha_bias_deg;
     double vane_beta_bias_deg;
 
-    /* Gyros */
-    double gyro_noise_std_radps;
+    /* Gyros: sesgo determinista; el ruido viene del modelo de IMU */
     double gyro_bias_x_radps;
     double gyro_bias_y_radps;
     double gyro_bias_z_radps;
 
-    /* Acelerómetros */
-    double accel_noise_std_mps2;
+    /* Acelerómetros: sesgo determinista */
     double accel_bias_x_mps2;
     double accel_bias_y_mps2;
     double accel_bias_z_mps2;
+
+    /* Modelo de ruido de la IMU (imu_sensor.h). Teoría:
+     * docs/teoria/sensores/ruido_sensores.tex */
+    int    imu_profile;        // IMU_PROFILE_FLOOR o IMU_PROFILE_IDLE
+    bool   imu_flight;         // true: suma la vibración de vuelo
+    double imu_vib_env;        // >= 0: envolvente fija; < 0: aleatoria interna
+    double imu_noise_scale;    // escala todo el ruido
+    double imu_white_scale;    // escala el ruido blanco
+    double imu_vib_scale;      // escala la vibración
+    double imu_bias_scale;     // escala el sesgo aleatorio b0
 
     /* GPS */
     double gps_pos_noise_std_m;
@@ -206,6 +219,10 @@ typedef struct
     double prev_w_ms;
     double prev_v_ms;
     bool   prev_valid;
+
+    /* IMU: modelo de ruido y tiempo acumulado desde la última muestra */
+    ImuSensor imu;
+    double    imu_accum_s;
 
     /* Generador pseudoaleatorio: un estado por sensor (SensorsRng_e) */
     uint32_t rng_state[SENSORS_RNG_N];

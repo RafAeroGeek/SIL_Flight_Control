@@ -43,6 +43,7 @@ SIL_Flight_Control/
 | `dynamics`             | Matrices A/B lon y lat, RK4 (4x1 y n/m), señales      |
 | `aircraft_loader`      | Carga parámetros y config de servos desde el JSON     |
 | `sensors_sim`          | Pitot, veleta (α, β), IMU, GPS y láser, ruido y bias  |
+| `imu_sensor.h`         | Ruido de la IMU ajustado a un log de vuelo            |
 | `atmosphere`           | Densidad ISA (troposfera), igual a `dynamics/`        |
 | `flight_management`    | Capa de control: modo MANUAL (paso directo); lazos en el Paso 4 |
 | `sim_PWM_processing`   | Banco de canales PWM (compilado, aún sin usar)        |
@@ -180,14 +181,14 @@ columnas del pitot (`pitot_ms`, `tas_ms`, `dp_pa`: V = √(u²+v²+w²) incluye 
 v a segundo orden). Cada sensor tiene su propia secuencia de ruido, así que agregar o
 quitar ruido en uno no cambia las columnas de los demás.
 
-La línea base vigente es `b48585b` (giros y acelerómetros con 6 decimales);
-las anteriores (`cf639a6`, `2220e20`, …) ya no aplican.
+La línea base vigente es `2632b23` (IMU con el ruido del log de vuelo; frente a
+`b48585b` solo cambian giros y acelerómetros); las anteriores ya no aplican.
 
 ## Documentación teórica (`docs/teoria/`)
 
 La teoría de los modelos va en LaTeX, un documento por tema (ver
 `docs/teoria/README.md`). Hoy: `docs/teoria/sensores/ruido_sensores.tex`
-(pitot, veleta, ISA y generador de ruido) y
+(pitot, veleta, IMU, ISA y generador de ruido) y
 `docs/teoria/control/control_lateral.tex` (diseño del control lateral). Compilar con
 `cd docs/teoria/sensores && latexmk -pdf ruido_sensores.tex`.
 

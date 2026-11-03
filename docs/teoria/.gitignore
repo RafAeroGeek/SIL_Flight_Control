@@ -13,3 +13,10 @@
 *.blg
 *.nav
 *.snm
+
+# imu_noise/: copias que no se versionan. El C vive en src/ y test/.
+sensores/imu_noise.zip
+sensores/imu_noise/imu_noise_model_validation\ (1).png
+sensores/imu_noise/imu_params.h
+sensores/imu_noise/imu_sensor.h
+sensores/imu_noise/imu_test.c
