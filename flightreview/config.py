@@ -40,6 +40,14 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "gyro_z": ["gyro_z_radps", "gyro_z", "gyro_r", "imu_gyro_z", "gyr_z", "r_radps"],
     "pitch_rate": ["dq_radps", "dq", "q_radps", "pitch_rate_radps"],
 
+    # --- Filtro de giros: salida (rad/s) y corte aplicado (Hz) ---
+    "gyro_x_filt": ["gyro_x_radps_filtered"],
+    "gyro_y_filt": ["gyro_y_radps_filtered"],
+    "gyro_z_filt": ["gyro_z_radps_filtered"],
+    "gyro_x_fc": ["gyro_x_fc_hz"],
+    "gyro_y_fc": ["gyro_y_fc_hz"],
+    "gyro_z_fc": ["gyro_z_fc_hz"],
+
     # --- Vibracion / acelerometros (m/s^2) ---
     "acc_x": ["acc_x_mps2", "accel_x", "acc_x", "imu_accel_x", "ax_mps2"],
     "acc_y": ["acc_y_mps2", "accel_y", "acc_y", "imu_accel_y", "ay_mps2"],
