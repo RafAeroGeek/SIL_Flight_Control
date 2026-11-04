@@ -9,6 +9,7 @@
 #include "flight_sim.h"
 #include "flight_management.h"
 #include "gyro_filter.h"
+#include "lpf1.h"
 #include "sim_PWM_processing.h"
 #include "sim_task_management.h"
 #include "servo_sim.h"
@@ -36,6 +37,12 @@ static SimRc_s g_rc_sim;
 /* Filtro de giros (software de vuelo): corre en Task_5ms. */
 static GyroFilter g_gyro_filter;
 static double g_gyro_filt_radps[GYRO_FILTER_N_EJES];
+
+/* Filtro de la IAS del pitot: corre en Task_5ms para que las tareas lentas lean
+   una señal ya filtrada y no el ruido crudo submuestreado. Dentro de un tick,
+   Task_5ms corre antes que Task_30ms: Task_30ms lee el valor de su mismo tick. */
+static Lpf1 g_pitot_filter;
+static double g_pitot_filt_ms;
 
 /* Trim del transmisor [us], uno por servo: el comando del piloto se suma a
    este offset para que con el stick al centro la superficie quede en su
@@ -179,6 +186,7 @@ void task_init_1ms(void)
     fm_cfg.rudder_deg_per_stick = rc_yaw_deg_per_stick(servo_cfg[SERVO_RUDDER].k_deg_per_us);
     FM_Init(&fm_cfg, FM_MODE_MANUAL);
     GyroFilter_Init(&g_gyro_filter, fm_cfg.gyro_fc_hz);
+    Lpf1_Init(&g_pitot_filter, fm_cfg.pitot_fc_hz);
 
     /* Comando inicial = trim (sticks al centro). Sin esto el servo recibe 0 us
        hasta la primera corrida de Task_5ms (t = 5 ms) y se aleja del trim. */
@@ -200,6 +208,7 @@ void task_init_1ms(void)
                fm_cfg.lat.K_phi, fm_cfg.lat.K_psi, fm_cfg.max_bank_deg);
         printf("Filtro de giros: fc = %.1f, %.1f, %.1f Hz\n",
                g_gyro_filter.eje[0].fc_hz, g_gyro_filter.eje[1].fc_hz, g_gyro_filter.eje[2].fc_hz);
+        printf("Filtro de pitot: fc = %.1f Hz\n", g_pitot_filter.fc_hz);
 
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
@@ -480,7 +489,7 @@ static FM_State fm_state_desde_sensores(const SensorsSimData *d,
         .r_dps     = (float)(gyro_radps[2] * rad2deg),
         .alt_m     = (float)d->gps.alt_m,
         .vz_ms     = (float)(-d->gps.vd_ms),
-        .arsp_ms   = (float)d->pitot.ias_ms,
+        .arsp_ms   = (float)g_pitot_filt_ms,
         .valid     = d->imu.valid && d->ahrs.valid,
     };
     return st;
@@ -515,6 +524,11 @@ static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
         g_sens_data.imu.gyro_radps.z,
     };
     GyroFilter_Update(&g_gyro_filter, gyro_radps, (double)dt_s, g_gyro_filt_radps);
+
+    /* Sin medición válida se retiene el último valor */
+    if (g_sens_data.pitot.valid) {
+        g_pitot_filt_ms = Lpf1_Update(&g_pitot_filter, g_sens_data.pitot.ias_ms, (double)dt_s);
+    }
 
     const FM_State fm_st = fm_state_desde_sensores(&g_sens_data, g_gyro_filt_radps);
     FM_Update_5ms(&fm_in, &fm_st, dt_s);

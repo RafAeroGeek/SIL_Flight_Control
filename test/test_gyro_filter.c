@@ -106,11 +106,30 @@ static void test_configuracion(void)
     EXPECT_TRUE(y[2] > 0.0 && y[2] < 1.0);
 }
 
+/* T5: Lpf1 suelto: primera muestra, escalón a 5 Hz y fc = 0 */
+static void test_lpf1(void)
+{
+    const double tau = 1.0 / (2.0 * PI_D * 5.0);
+    Lpf1 f;
+
+    Lpf1_Init(&f, 5.0f);
+    EXPECT_TRUE(cerca(Lpf1_Update(&f, 24.0, DT_S), 24.0, 1e-12));
+    for (int k = 1; k <= 100; ++k) {
+        const double y = Lpf1_Update(&f, 25.0, DT_S);
+        EXPECT_TRUE(cerca(y, 25.0 - exp(-k * DT_S / tau), 1e-4));
+    }
+
+    Lpf1_Init(&f, 0.0f);
+    (void)Lpf1_Update(&f, 1.0, DT_S);
+    EXPECT_TRUE(Lpf1_Update(&f, 3.0, DT_S) == 3.0);
+}
+
 int main(void)
 {
     test_primera_muestra();
     test_escalon();
     test_corte();
     test_configuracion();
+    test_lpf1();
     TEST_RETURN();
 }

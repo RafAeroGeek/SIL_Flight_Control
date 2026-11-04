@@ -283,6 +283,7 @@ static const struct {
     { "gyro_roll_rate_fc_hz",  offsetof(FM_Config, gyro_fc_hz[0]) },
     { "gyro_pitch_rate_fc_hz", offsetof(FM_Config, gyro_fc_hz[1]) },
     { "gyro_yaw_rate_fc_hz",   offsetof(FM_Config, gyro_fc_hz[2]) },
+    { "pitot_fc_hz",           offsetof(FM_Config, pitot_fc_hz)   },
 };
 
 bool Aircraft_LoadFcsGains(const char *json_path, FM_Config *out)

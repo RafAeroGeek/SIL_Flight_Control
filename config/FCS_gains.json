@@ -7,5 +7,6 @@
   "phi_max_deg": 30.0,
   "gyro_roll_rate_fc_hz": 20.0,
   "gyro_pitch_rate_fc_hz": 20.0,
-  "gyro_yaw_rate_fc_hz": 20.0
+  "gyro_yaw_rate_fc_hz": 20.0,
+  "pitot_fc_hz": 5.0
 }
