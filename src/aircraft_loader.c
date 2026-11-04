@@ -268,6 +268,59 @@ bool Aircraft_LoadServoCfg(const char *json_path, ServoCfg_s out[SERVO_SIM_N_SER
     return true;
 }
 
+/* Fuente unica de verdad clave-json <-> campo de FM_Config.
+ * Para agregar una ganancia: agregar su campo y una fila aqui. */
+static const struct {
+    const char *key;
+    size_t      offset;
+} kFcsFields[] = {
+    { "K_r",         offsetof(FM_Config, lat.K_r)      },
+    { "tau_wo_s",    offsetof(FM_Config, lat.tau_wo_s) },
+    { "K_p",         offsetof(FM_Config, lat.K_p)      },
+    { "K_phi",       offsetof(FM_Config, lat.K_phi)    },
+    { "K_psi",       offsetof(FM_Config, lat.K_psi)    },
+    { "phi_max_deg", offsetof(FM_Config, max_bank_deg) },
+};
+
+bool Aircraft_LoadFcsGains(const char *json_path, FM_Config *out)
+{
+    if (out == NULL) {
+        return false;
+    }
+
+    FILE *fp = fopen(json_path, "r");
+    if (fp == NULL) {
+        perror("Aircraft_LoadFcsGains: fopen");
+        return false;
+    }
+
+    char buf[AIRCRAFT_JSON_BUF_SIZE];
+    size_t n = fread(buf, 1u, sizeof(buf) - 1u, fp);
+    fclose(fp);
+    buf[n] = '\0';
+
+    if (n == 0u) {
+        fprintf(stderr, "Aircraft_LoadFcsGains: %s esta vacio\n", json_path);
+        return false;
+    }
+    if (n == AIRCRAFT_JSON_BUF_SIZE - 1u) {
+        fprintf(stderr, "Aircraft_LoadFcsGains: %s pudo truncarse (buffer de %u B)\n",
+                json_path, AIRCRAFT_JSON_BUF_SIZE);
+    }
+
+    for (size_t i = 0; i < sizeof(kFcsFields) / sizeof(kFcsFields[0]); i++) {
+        float value;
+        if (find_number(buf, kFcsFields[i].key, &value)) {
+            *(float *)((char *)out + kFcsFields[i].offset) = value;
+        } else {
+            fprintf(stderr, "Aircraft_LoadFcsGains: falta '%s' en %s\n",
+                    kFcsFields[i].key, json_path);
+        }
+    }
+
+    return true;
+}
+
 #else /* SYSTEM_SIM_ENV == SIM_PLATFORM_RTOS (u otra): sin filesystem garantizado */
 
 bool Aircraft_LoadParams(const char *json_path, Params *out)
@@ -281,6 +334,13 @@ bool Aircraft_LoadServoCfg(const char *json_path, ServoCfg_s out[SERVO_SIM_N_SER
 {
     (void)json_path;
     (void)out;               /* out[] se queda con los defaults del llamador */
+    return false;
+}
+
+bool Aircraft_LoadFcsGains(const char *json_path, FM_Config *out)
+{
+    (void)json_path;
+    (void)out;               /* out se queda como lo dejo el llamador */
     return false;
 }
 

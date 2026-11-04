@@ -155,10 +155,11 @@ void task_init_1ms(void)
     FlightSim_Actuators_init(&g_act, &g_params);
 
     /* Flight management: arranca en MANUAL (paso directo de los sticks).
-       Los campos de lazos de FM_Config se llenan al implementar cada modo. */
+       Si falla la carga, las ganancias quedan en 0 y ya se avisó por stderr. */
     FM_Config fm_cfg = {0};
     fm_cfg.thr_min = 0.0f;
     fm_cfg.thr_max = 1.0f;
+    (void)Aircraft_LoadFcsGains(FCS_GAINS_JSON_PATH, &fm_cfg);
     FM_Init(&fm_cfg, FM_MODE_MANUAL);
 
     /* 3) Servos: base = tabla compilada; overrides opcionales del JSON de la
@@ -186,6 +187,10 @@ void task_init_1ms(void)
             imprimir_matriz("A_lat [dv,dp,dr,dphi,dpsi]", &g_sim.A_lat[0][0], DYN_N_LAT, DYN_N_LAT);
             imprimir_matriz("B_lat [da,dr]",              &g_sim.B_lat[0][0], DYN_N_LAT, DYN_M_LAT);
         #endif
+
+        printf("Ganancias FCS: K_r=%.3f tau_wo=%.3f K_p=%.3f K_phi=%.3f K_psi=%.3f phi_max=%.1f deg\n",
+               fm_cfg.lat.K_r, fm_cfg.lat.tau_wo_s, fm_cfg.lat.K_p,
+               fm_cfg.lat.K_phi, fm_cfg.lat.K_psi, fm_cfg.max_bank_deg);
 
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);

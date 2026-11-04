@@ -103,6 +103,20 @@ if(SIL_BUILD_TESTS)
     )
     add_test(NAME test_aircraft_loader_lat COMMAND test_aircraft_loader_lat)
 
+    add_executable(test_aircraft_loader_fcs
+        test/test_aircraft_loader_fcs.c
+        src/aircraft_loader.c
+        src/servo_sim.c
+        src/dynamics.c
+    )
+    target_include_directories(test_aircraft_loader_fcs PRIVATE src test)
+    target_compile_options(test_aircraft_loader_fcs PRIVATE -Wall)
+    target_link_libraries(test_aircraft_loader_fcs PRIVATE m)
+    target_compile_definitions(test_aircraft_loader_fcs PRIVATE
+        TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}"
+    )
+    add_test(NAME test_aircraft_loader_fcs COMMAND test_aircraft_loader_fcs)
+
     add_executable(test_lateral_matrices
         test/test_lateral_matrices.c
         src/dynamics.c

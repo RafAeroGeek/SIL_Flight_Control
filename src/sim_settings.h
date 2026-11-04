@@ -30,6 +30,9 @@
    del repo). Para cambiar de aeronave: edita este string y recompila. */
 #define 	AIRCRAFT_JSON_PATH	"aircraft/ugly_stick.json"
 
+/* Ganancias del FCS, misma convencion de ruta que AIRCRAFT_JSON_PATH */
+#define 	FCS_GAINS_JSON_PATH	"config/FCS_gains.json"
+
 
 /* 1 = integra dinamica lateral-direccional ; 0 = solo longitudinal */
 #define 	SIL_CONFIG_LATERAL	1
