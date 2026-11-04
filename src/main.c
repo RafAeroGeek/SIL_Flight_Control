@@ -305,7 +305,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
          .throttle   = rc_sim.s[RC_CH_THROTTLE],
      };
      const FM_State fm_st = {0};   // sin AHRS todavía: valid = false
-     FM_Update(&fm_in, &fm_st, dt_s);
+     FM_Update_5ms(&fm_in, &fm_st, dt_s);
 
      FM_CommandsNorm fm_out;
      FM_GetCmdOut(&fm_out);

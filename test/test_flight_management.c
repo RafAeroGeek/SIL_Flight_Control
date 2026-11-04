@@ -33,7 +33,7 @@ static void test_paso_directo(void)
 {
     FM_Init(NULL, FM_MODE_MANUAL);
     const FM_State st = {0};
-    FM_Update(&k_cmd, &st, 0.001f);
+    FM_Update_5ms(&k_cmd, &st, 0.005f);
 
     FM_CommandsNorm out;
     FM_GetCmdOut(&out);
@@ -60,7 +60,7 @@ static void test_status(void)
     EXPECT_TRUE(FM_IsArmed());
 
     const FM_State st = {0};
-    FM_Update(&k_cmd, &st, 0.001f);
+    FM_Update_5ms(&k_cmd, &st, 0.005f);
 
     FM_Status s;
     FM_GetStatus(&s);
