@@ -241,7 +241,8 @@ void task_init_1ms(void)
                         "yaw_mode,"                                         // FM_YawMode
                         "gyro_x_radps_filtered,gyro_y_radps_filtered,gyro_z_radps_filtered,"
                         "gyro_x_fc_hz,gyro_y_fc_hz,gyro_z_fc_hz,"           // filtro de giros
-                        "yd_r_wo_dps,yd_dr_deg\n" );                        // yaw damper
+                        "yd_r_wo_dps,yd_dr_deg,"                            // yaw damper
+                        "pitot_ms_filtered,pitot_fc_hz\n" );                // filtro de pitot
 
             fflush(g_fp);
             printf("CSV abierto: %s\n", csv_path);
@@ -400,7 +401,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%d,"                        // yaw_mode
                     "%.6f,%.6f,%.6f,"            // giros filtrados [rad/s]
                     "%.3f,%.3f,%.3f,"            // corte aplicado [Hz]
-                    "%.6f,%.6f\n",               // r lavada [deg/s], delta_r de la ley [deg]
+                    "%.6f,%.6f,"                 // r lavada [deg/s], delta_r de la ley [deg]
+                    "%.6f,%.3f\n",               // IAS filtrada [m/s], corte aplicado [Hz]
                     (double)t_s,                                            // 1. tiempo
                     (double)u_elev, (double)u_ail,                          // comandos us
                     (double)u_rud,  (double)u_thro,
@@ -453,7 +455,12 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     (double)g_gyro_filter.eje[0].fc_hz, (double)g_gyro_filter.eje[1].fc_hz,
                     (double)g_gyro_filter.eje[2].fc_hz,
 
-                    (double)fm_status.yd_r_wo_dps, (double)fm_status.yd_dr_deg );
+                    (double)fm_status.yd_r_wo_dps, (double)fm_status.yd_dr_deg,
+
+                    /* Antes de la primera corrida del filtro (t = 5 ms) se registra
+                       la medición: un 0 se vería como un salto de 24 m/s en el log */
+                    g_pitot_filter.con_muestra ? g_pitot_filt_ms : (double)g_sens_data.pitot.ias_ms,
+                    (double)g_pitot_filter.fc_hz );
 
             /* Flush cada 100 ms */
             if ((now_ms % 100u) == 0u) {
