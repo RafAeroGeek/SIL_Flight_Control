@@ -1,7 +1,7 @@
 # Status del proyecto — SIL_Flight_Control
 
-**Fecha de revisión:** 2026-11-02
-**Último commit en `main`:** `f67e628` Merge PR #23 (ruido de IMU desde vuelos de prueba)
+**Fecha de revisión:** 2026-11-04
+**Último commit en `main`:** `930dfae` Merge PR #25 (software de vuelo en `Task_5ms`)
 **Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`), `v0.3-dynamics` (2026-10-22, `717c056`)
 **Versión en `CMakeLists.txt`:** 0.3.0
 
@@ -10,7 +10,7 @@
 ## 1. Estado actual
 
 ### Git
-- `main` al día con `origin/main`; PRs #1–#23 mergeados (el #19 entró en
+- `main` al día con `origin/main`; PRs #1–#25 mergeados (el #19 entró en
   `feat/dpsi` y llegó a `main` con el #21). Sin ramas abiertas.
 
 ### Build y tests (verificado 2026-11-02)
@@ -113,7 +113,7 @@ inserta algo antes de seguir.
 | F2 ✅ | Diseño de ganancias en Python (clásico en cascada, ζ_DR ≥ 0.4, espiral estable) + `docs/teoria/control/control_lateral.tex` |
 | F3a ✅ | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) — #20 |
 | F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto — #23 |
-| F3a++ | Software de vuelo en `Task_5ms` (`FM_Update_5ms`, modo, armado, mezcla a us); `Task_1ms` queda como mundo físico |
+| F3a++ ✅ | Software de vuelo en `Task_5ms` (`FM_Update_5ms`, modo, armado, mezcla a us); `Task_1ms` queda como mundo físico — #25 |
 | F3b | AHRS ideal con ruido + adaptar `FM_Config` (rumbo por alabeo, no por r_cmd); los giros de `FM_State` ya traen vibración. La IMU muestrea en t = 1, 6, 11 ms y `Task_5ms` corre en t = 5, 10, 15 ms: el FM lee giros con 4 ms de antigüedad; decidir aquí si se alinea |
 | F4 | Yaw damper; decidir aquí el filtro de giros (`p`: 0.085 rad/s RMS a 11–18 Hz; el log parece ya filtrado por ArduPilot) |
 | F5 | Modo estabilizado: wing leveler, stick → φ_cmd |
