@@ -139,6 +139,12 @@ typedef struct
     // Lazos laterales
     FM_LateralGains lat;
 
+    // Stick de yaw -> timón [deg por unidad de stick], signo incluido (Nelson)
+    float rudder_deg_per_stick;
+
+    // Corte del filtro de giros [Hz], ejes x, y, z; 0 = sin filtro
+    float gyro_fc_hz[3];
+
     // Failsafe
     float failsafe_thr;     // [0,1]
 } FM_Config;
@@ -162,6 +168,10 @@ typedef struct
     // Útil para telemetría:
     float psi_err_deg;      // heading error actual (wrap)
     float phi_cmd_from_heading_deg;
+
+    // Yaw damper (en 0 si no está activo)
+    float yd_r_wo_dps;      // r lavada
+    float yd_dr_deg;        // delta_r de la ley, respecto al trim
 } FM_Status;
 /* ============================================================
  * Ejecuciones por cascada
@@ -179,7 +189,7 @@ typedef struct
  * ========================= */
 void FM_Init(const FM_Config *cfg, FM_Mode initial_mode);
 
-/* Solo acepta modos implementados (por ahora FM_MODE_MANUAL); un modo no
+/* Solo acepta modos implementados (MANUAL y GYRO_STAB); un modo no
    implementado o fuera de rango se ignora y el modo actual se mantiene. */
 void    FM_SetMode(FM_Mode mode);
 
@@ -187,6 +197,7 @@ void    FM_SetMode(FM_Mode mode);
      0 -> MANUAL
      1 -> ATTITUDE + FM_YAW_MODE_RATE          (estabilizado)
      2 -> ATTITUDE + FM_YAW_MODE_HEADING_HOLD  (rumbo)
+     3 -> GYRO_STAB + FM_YAW_MODE_RATE         (solo yaw damper, para probarlo)
    Un valor fuera de rango o un modo no implementado se ignora: modo y yaw_mode
    no cambian. */
 void    FM_SetModeSwitch(int mode_switch);

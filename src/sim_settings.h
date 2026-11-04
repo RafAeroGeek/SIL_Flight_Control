@@ -43,8 +43,13 @@
    dobletes pequenos de aleron y timon, dentro del rango lineal.
    ROUTINE_LONGITUDINAL: da un escalon de roll = 1.0 -> 500 us -> aleron
    saturado a 20 deg; con el lateral activo lleva phi muy fuera del rango
-   lineal. Queda SOLO para la regresion longitudinal. */
+   lineal. Queda SOLO para la regresion longitudinal.
+   ROUTINE_YAW_DAMPER: mismo doblete de timon en MANUAL y con el yaw damper.
+   Se puede elegir al compilar:
+   cmake -DCMAKE_C_FLAGS=-DSIM_PILOT_ROUTINE=ROUTINE_YAW_DAMPER ... */
+#ifndef SIM_PILOT_ROUTINE
 #define 	SIM_PILOT_ROUTINE	ROUTINE_LAT_DIR
+#endif
 
 /* Ganancia stick normalizado ([-1,1] ejes, [0,1] throttle) -> delta PWM [us].
    El piloto emite valores normalizados; main.c los convierte a us antes de los servos. */

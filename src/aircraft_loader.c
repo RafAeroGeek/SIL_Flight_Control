@@ -280,6 +280,9 @@ static const struct {
     { "K_phi",       offsetof(FM_Config, lat.K_phi)    },
     { "K_psi",       offsetof(FM_Config, lat.K_psi)    },
     { "phi_max_deg", offsetof(FM_Config, max_bank_deg) },
+    { "gyro_roll_rate_fc_hz",  offsetof(FM_Config, gyro_fc_hz[0]) },
+    { "gyro_pitch_rate_fc_hz", offsetof(FM_Config, gyro_fc_hz[1]) },
+    { "gyro_yaw_rate_fc_hz",   offsetof(FM_Config, gyro_fc_hz[2]) },
 };
 
 bool Aircraft_LoadFcsGains(const char *json_path, FM_Config *out)

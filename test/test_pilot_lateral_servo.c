@@ -211,11 +211,36 @@ static void test_signo_planta(void)
     EXPECT_TRUE(sim.X_lat[2] > 0.0);   // dr
 }
 
+/* T6: la rutina del yaw damper repite el doblete y cambia de modo a 5 s */
+static void test_rutina_yaw_damper(void)
+{
+    const pilotcommand_s antes = pilot_source_commands(4999u, ROUTINE_YAW_DAMPER);
+    EXPECT_TRUE(antes.mode_switch == 0);
+    EXPECT_FLOAT_EQ(antes.yaw, 0.0f);
+
+    const pilotcommand_s despues = pilot_source_commands(5000u, ROUTINE_YAW_DAMPER);
+    EXPECT_TRUE(despues.mode_switch == 3);
+
+    for (uint32_t ms = 0u; ms < 4000u; ms += 500u) {
+        const pilotcommand_s a = pilot_source_commands(1000u + ms, ROUTINE_YAW_DAMPER);
+        const pilotcommand_s b = pilot_source_commands(6000u + ms, ROUTINE_YAW_DAMPER);
+        EXPECT_TRUE(fabsf(a.yaw - b.yaw) < 1e-6f);
+    }
+}
+
+/* T5: stick de yaw -> timón, de punta a punta: 0.18 deg/us * 500 us * (-1) */
+static void test_yaw_deg_por_stick(void)
+{
+    EXPECT_FLOAT_EQ(rc_yaw_deg_per_stick(0.18f), -90.0f);
+}
+
 int main(void)
 {
     test_ruteo();
     test_escalon();
     test_saturacion_y_rate();
     test_signo_planta();
+    test_yaw_deg_por_stick();
+    test_rutina_yaw_damper();
     TEST_RETURN();
 }

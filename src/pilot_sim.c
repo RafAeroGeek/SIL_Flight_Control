@@ -46,6 +46,20 @@ pilotcommand_s pilot_source_commands(uint32_t now_ms, unsigned id_routine)
 
             current_commands.flaps      = 0.0;
             break;
+        case ROUTINE_YAW_DAMPER:
+            /* Mismo doblete de timón (0.03 de stick) en MANUAL, de 1.0 a 3.0 s, y
+               con el yaw damper, de 6.0 a 8.0 s. El modo cambia a 5.0 s. */
+            current_commands.roll       = 0.0;
+            current_commands.pitch      = 0.0;
+            current_commands.yaw        = step_cmd(now_ms, 1000u, 0.03) + step_cmd(now_ms, 2000u, -0.06) + step_cmd(now_ms, 3000u, 0.03)
+                                        + step_cmd(now_ms, 6000u, 0.03) + step_cmd(now_ms, 7000u, -0.06) + step_cmd(now_ms, 8000u, 0.03);
+            current_commands.throttle   = 0.0;
+
+            current_commands.mode_switch= (now_ms >= 5000u) ? 3 : 0;
+            current_commands.arm_switch = 0;
+
+            current_commands.flaps      = 0.0;
+            break;
         case ROUTINE_ESTATICA:
             current_commands.roll       = 0.0;
             current_commands.pitch      = 0.0;
@@ -93,6 +107,11 @@ SimRc_s rc_source(pilotcommand_s pilot) {
     return rc_out;
 }
 
+
+float rc_yaw_deg_per_stick(float rudder_k_deg_per_us)
+{
+    return rudder_k_deg_per_us * RC_STICK_TO_US * RC_YAW_TO_RUDDER_SIGN;
+}
 
 void rc_to_servo_cmds_us(const SimRc_s *rc,
                          const float trim_us[SERVO_SIM_N_SERVOS],

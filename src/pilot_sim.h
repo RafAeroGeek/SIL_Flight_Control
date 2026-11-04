@@ -27,6 +27,7 @@ typedef enum
     ROUTINE_LONGITUDINAL = 1,   // roll + pitch: rutina de regresión actual
     ROUTINE_ESTATICA     = 2,   // todo a cero (compat con el case 2 previo)
     ROUTINE_LAT_DIR      = 3,   // escalones de yaw y throttle
+    ROUTINE_YAW_DAMPER   = 4,   // mismo doblete de timón en MANUAL y en GYRO_STAB
     ROUTINE_COUNT
 } RoutineID;
 
@@ -61,6 +62,10 @@ SimRc_s rc_source(pilotcommand_s pilot);
 void rc_to_servo_cmds_us(const SimRc_s *rc,
                          const float trim_us[SERVO_SIM_N_SERVOS],
                          float cmd_us[SERVO_SIM_N_SERVOS]);
+
+/* Deflexión del timón por unidad de stick de yaw [deg], con el mismo ruteo de
+   rc_to_servo_cmds_us. Convierte a stick las leyes que calculan delta_r. */
+float rc_yaw_deg_per_stick(float rudder_k_deg_per_us);
 
 
 #endif // PILOT_SIM_H_INCLUDED

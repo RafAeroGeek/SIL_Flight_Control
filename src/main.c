@@ -8,6 +8,7 @@
 #include "dynamics.h"
 #include "flight_sim.h"
 #include "flight_management.h"
+#include "gyro_filter.h"
 #include "sim_PWM_processing.h"
 #include "sim_task_management.h"
 #include "servo_sim.h"
@@ -31,6 +32,10 @@ static SensorsSimData g_sens_data;
 
 /* Canales RC del piloto: los escribe Task_1ms y los lee Task_5ms. */
 static SimRc_s g_rc_sim;
+
+/* Filtro de giros (software de vuelo): corre en Task_5ms. */
+static GyroFilter g_gyro_filter;
+static double g_gyro_filt_radps[GYRO_FILTER_N_EJES];
 
 /* Trim del transmisor [us], uno por servo: el comando del piloto se suma a
    este offset para que con el stick al centro la superficie quede en su
@@ -154,14 +159,6 @@ void task_init_1ms(void)
 
     FlightSim_Actuators_init(&g_act, &g_params);
 
-    /* Flight management: arranca en MANUAL (paso directo de los sticks).
-       Si falla la carga, las ganancias quedan en 0 y ya se avisó por stderr. */
-    FM_Config fm_cfg = {0};
-    fm_cfg.thr_min = 0.0f;
-    fm_cfg.thr_max = 1.0f;
-    (void)Aircraft_LoadFcsGains(FCS_GAINS_JSON_PATH, &fm_cfg);
-    FM_Init(&fm_cfg, FM_MODE_MANUAL);
-
     /* 3) Servos: base = tabla compilada; overrides opcionales del JSON de la
        aeronave (dt_s se mantiene en el default: es del arnes SIL, no del
        airframe). Si el JSON no trae claves servo_*, quedan los defaults. */
@@ -172,6 +169,16 @@ void task_init_1ms(void)
     aplicar_trim_servo(servo_cfg, SERVO_AILERON,  g_params.delta_a_trim_deg);
     aplicar_trim_servo(servo_cfg, SERVO_RUDDER,   g_params.delta_r_trim_deg);
     Servos_Init_All_Cfg(servo_cfg);
+
+    /* Flight management: arranca en MANUAL (paso directo de los sticks).
+       Si falla la carga, las ganancias quedan en 0 y ya se avisó por stderr. */
+    FM_Config fm_cfg = {0};
+    fm_cfg.thr_min = 0.0f;
+    fm_cfg.thr_max = 1.0f;
+    (void)Aircraft_LoadFcsGains(FCS_GAINS_JSON_PATH, &fm_cfg);
+    fm_cfg.rudder_deg_per_stick = rc_yaw_deg_per_stick(servo_cfg[SERVO_RUDDER].k_deg_per_us);
+    FM_Init(&fm_cfg, FM_MODE_MANUAL);
+    GyroFilter_Init(&g_gyro_filter, fm_cfg.gyro_fc_hz);
 
     /* Comando inicial = trim (sticks al centro). Sin esto el servo recibe 0 us
        hasta la primera corrida de Task_5ms (t = 5 ms) y se aleja del trim. */
@@ -191,6 +198,8 @@ void task_init_1ms(void)
         printf("Ganancias FCS: K_r=%.3f tau_wo=%.3f K_p=%.3f K_phi=%.3f K_psi=%.3f phi_max=%.1f deg\n",
                fm_cfg.lat.K_r, fm_cfg.lat.tau_wo_s, fm_cfg.lat.K_p,
                fm_cfg.lat.K_phi, fm_cfg.lat.K_psi, fm_cfg.max_bank_deg);
+        printf("Filtro de giros: fc = %.1f, %.1f, %.1f Hz\n",
+               g_gyro_filter.fc_hz[0], g_gyro_filter.fc_hz[1], g_gyro_filter.fc_hz[2]);
 
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
@@ -220,7 +229,10 @@ void task_init_1ms(void)
                         "laser_alt_m,"                                      // Laser
                         "dv_mps,dp_radps,dr_radps,dphi_rad,dpsi_rad,"       // Estado lateral-direccional
                         "ahrs_phi_deg,ahrs_theta_deg,ahrs_psi_deg,"         // AHRS ideal
-                        "yaw_mode\n" );                                     // FM_YawMode
+                        "yaw_mode,"                                         // FM_YawMode
+                        "gyro_x_radps_filtered,gyro_y_radps_filtered,gyro_z_radps_filtered,"
+                        "gyro_x_fc_hz,gyro_y_fc_hz,gyro_z_fc_hz,"           // filtro de giros
+                        "yd_r_wo_dps,yd_dr_deg\n" );                        // yaw damper
 
             fflush(g_fp);
             printf("CSV abierto: %s\n", csv_path);
@@ -376,7 +388,10 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.6f,"                 // Laser
                     "%.6f,%.6f,%.6f,%.6f,%.6f,"  // dv, dp, dr, dphi, dpsi
                     "%.6f,%.6f,%.6f,"            // AHRS phi, theta, psi [deg]
-                    "%d\n",                      // yaw_mode
+                    "%d,"                        // yaw_mode
+                    "%.6f,%.6f,%.6f,"            // giros filtrados [rad/s]
+                    "%.3f,%.3f,%.3f,"            // corte aplicado [Hz]
+                    "%.6f,%.6f\n",               // r lavada [deg/s], delta_r de la ley [deg]
                     (double)t_s,                                            // 1. tiempo
                     (double)u_elev, (double)u_ail,                          // comandos us
                     (double)u_rud,  (double)u_thro,
@@ -423,7 +438,13 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     g_sens_data.ahrs.phi_deg, g_sens_data.ahrs.theta_deg,   // AHRS
                     g_sens_data.ahrs.psi_deg,
 
-                    (int)fm_status.yaw_mode );
+                    (int)fm_status.yaw_mode,
+
+                    g_gyro_filt_radps[0], g_gyro_filt_radps[1], g_gyro_filt_radps[2],
+                    (double)g_gyro_filter.fc_hz[0], (double)g_gyro_filter.fc_hz[1],
+                    (double)g_gyro_filter.fc_hz[2],
+
+                    (double)fm_status.yd_r_wo_dps, (double)fm_status.yd_dr_deg );
 
             /* Flush cada 100 ms */
             if ((now_ms % 100u) == 0u) {
@@ -446,16 +467,17 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
    La IMU muestrea en t = 1, 6, 11 ms y Task_5ms corre en t = 5, 10, 15 ms: los
    giros llegan con 4 ms de antigüedad, despreciable frente a los 160 ms de
    retardo que tolera el diseño (control_lateral.tex). */
-static FM_State fm_state_desde_sensores(const SensorsSimData *d)
+static FM_State fm_state_desde_sensores(const SensorsSimData *d,
+                                        const double gyro_radps[GYRO_FILTER_N_EJES])
 {
     const double rad2deg = 180.0 / SENSORS_SIM_PI;
     const FM_State st = {
         .phi_deg   = (float)d->ahrs.phi_deg,
         .theta_deg = (float)d->ahrs.theta_deg,
         .psi_deg   = (float)d->ahrs.psi_deg,
-        .p_dps     = (float)(d->imu.gyro_radps.x * rad2deg),
-        .q_dps     = (float)(d->imu.gyro_radps.y * rad2deg),
-        .r_dps     = (float)(d->imu.gyro_radps.z * rad2deg),
+        .p_dps     = (float)(gyro_radps[0] * rad2deg),
+        .q_dps     = (float)(gyro_radps[1] * rad2deg),
+        .r_dps     = (float)(gyro_radps[2] * rad2deg),
         .alt_m     = (float)d->gps.alt_m,
         .vz_ms     = (float)(-d->gps.vd_ms),
         .arsp_ms   = (float)d->pitot.ias_ms,
@@ -487,7 +509,14 @@ static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
         .yaw_norm   = g_rc_sim.s[RC_CH_YAW],
         .throttle   = g_rc_sim.s[RC_CH_THROTTLE],
     };
-    const FM_State fm_st = fm_state_desde_sensores(&g_sens_data);
+    const double gyro_radps[GYRO_FILTER_N_EJES] = {
+        g_sens_data.imu.gyro_radps.x,
+        g_sens_data.imu.gyro_radps.y,
+        g_sens_data.imu.gyro_radps.z,
+    };
+    GyroFilter_Update(&g_gyro_filter, gyro_radps, (double)dt_s, g_gyro_filt_radps);
+
+    const FM_State fm_st = fm_state_desde_sensores(&g_sens_data, g_gyro_filt_radps);
     FM_Update_5ms(&fm_in, &fm_st, dt_s);
 
     FM_CommandsNorm fm_out;

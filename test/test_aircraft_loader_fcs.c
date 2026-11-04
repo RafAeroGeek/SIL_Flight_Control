@@ -32,7 +32,10 @@ static void test_valido(void)
                   "  \"K_p\": 0.25,\n"
                   "  \"K_phi\": 0.75,\n"
                   "  \"K_psi\": 2.0,\n"
-                  "  \"phi_max_deg\": 35.0\n"
+                  "  \"phi_max_deg\": 35.0,\n"
+                  "  \"gyro_roll_rate_fc_hz\": 10.0,\n"
+                  "  \"gyro_pitch_rate_fc_hz\": 15.0,\n"
+                  "  \"gyro_yaw_rate_fc_hz\": 25.0\n"
                   "}\n");
 
     FM_Config cfg;
@@ -44,6 +47,9 @@ static void test_valido(void)
     EXPECT_FLOAT_EQ(cfg.lat.K_phi, 0.75f);
     EXPECT_FLOAT_EQ(cfg.lat.K_psi, 2.0f);
     EXPECT_FLOAT_EQ(cfg.max_bank_deg, 35.0f);
+    EXPECT_FLOAT_EQ(cfg.gyro_fc_hz[0], 10.0f);
+    EXPECT_FLOAT_EQ(cfg.gyro_fc_hz[1], 15.0f);
+    EXPECT_FLOAT_EQ(cfg.gyro_fc_hz[2], 25.0f);
 }
 
 /* T2: una clave faltante deja el valor previo y no afecta a las demás */
