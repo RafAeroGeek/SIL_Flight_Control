@@ -104,6 +104,7 @@ void task_init_1ms(void)
     scfg.imu_enabled   = true;
     scfg.gps_enabled   = true;
     scfg.laser_enabled = true;
+    scfg.ahrs_enabled  = true;
 
     scfg.random_seed = 1234u;
 
@@ -142,15 +143,23 @@ void task_init_1ms(void)
     scfg.noise.laser_noise_std_m = 0.03;
     scfg.noise.laser_bias_m      = 0.0;
 
+    /* AHRS ideal: sigmas PROPUESTOS - REVISAR (sin datos medidos) */
+    scfg.noise.ahrs_att_noise_std_deg = 0.2;
+    scfg.noise.ahrs_psi_noise_std_deg = 0.5;
+    scfg.noise.ahrs_phi_bias_deg      = 0.0;
+    scfg.noise.ahrs_theta_bias_deg    = 0.0;
+    scfg.noise.ahrs_psi_bias_deg      = 0.0;
+
     SensorsSim_Init(&g_sensors, &scfg, &g_sim);
 
     FlightSim_Actuators_init(&g_act, &g_params);
 
     /* Flight management: arranca en MANUAL (paso directo de los sticks).
-       Los campos de lazos de FM_Config se llenan al implementar cada modo. */
+       Si falla la carga, las ganancias quedan en 0 y ya se avisó por stderr. */
     FM_Config fm_cfg = {0};
     fm_cfg.thr_min = 0.0f;
     fm_cfg.thr_max = 1.0f;
+    (void)Aircraft_LoadFcsGains(FCS_GAINS_JSON_PATH, &fm_cfg);
     FM_Init(&fm_cfg, FM_MODE_MANUAL);
 
     /* 3) Servos: base = tabla compilada; overrides opcionales del JSON de la
@@ -179,6 +188,10 @@ void task_init_1ms(void)
             imprimir_matriz("B_lat [da,dr]",              &g_sim.B_lat[0][0], DYN_N_LAT, DYN_M_LAT);
         #endif
 
+        printf("Ganancias FCS: K_r=%.3f tau_wo=%.3f K_p=%.3f K_phi=%.3f K_psi=%.3f phi_max=%.1f deg\n",
+               fm_cfg.lat.K_r, fm_cfg.lat.tau_wo_s, fm_cfg.lat.K_p,
+               fm_cfg.lat.K_phi, fm_cfg.lat.K_psi, fm_cfg.max_bank_deg);
+
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
         printf("  Elevator: %.2f deg\n", g_act.elevator);
@@ -205,7 +218,9 @@ void task_init_1ms(void)
                         "gps_lat_deg,gps_lon_deg,gps_alt_m,"                // GPS data
                         "gps_vn_ms,gps_ve_ms,gps_vd_ms,"
                         "laser_alt_m,"                                      // Laser
-                        "dv_mps,dp_radps,dr_radps,dphi_rad,dpsi_rad\n" );   // Estado lateral-direccional
+                        "dv_mps,dp_radps,dr_radps,dphi_rad,dpsi_rad,"       // Estado lateral-direccional
+                        "ahrs_phi_deg,ahrs_theta_deg,ahrs_psi_deg,"         // AHRS ideal
+                        "yaw_mode\n" );                                     // FM_YawMode
 
             fflush(g_fp);
             printf("CSV abierto: %s\n", csv_path);
@@ -333,6 +348,9 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
         if (g_fp != NULL)
         {
 
+            FM_Status fm_status;
+            FM_GetStatus(&fm_status);
+
             /* Formato CSV con todas las señales:
                tiempo,
                comandos_us: elev, ail, rud, thro,
@@ -356,7 +374,9 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.7f,%.7f,%.3f,"       // gps lat, lon [deg] (1e-7 deg ~ 1 cm), alt
                     "%.3f,%.3f,%.3f,"       // gps vn ve vd
                     "%.6f,"                 // Laser
-                    "%.6f,%.6f,%.6f,%.6f,%.6f\n", // dv, dp, dr, dphi, dpsi
+                    "%.6f,%.6f,%.6f,%.6f,%.6f,"  // dv, dp, dr, dphi, dpsi
+                    "%.6f,%.6f,%.6f,"            // AHRS phi, theta, psi [deg]
+                    "%d\n",                      // yaw_mode
                     (double)t_s,                                            // 1. tiempo
                     (double)u_elev, (double)u_ail,                          // comandos us
                     (double)u_rud,  (double)u_thro,
@@ -371,7 +391,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     (double)u_rud,  (double)u_thro,
                     (double)pilot.roll, (double)pilot.pitch,                // 19. comandos originales
                     (double)pilot.yaw, (double)pilot.throttle,
-                    (double)pilot.mode_switch, (double)pilot.arm_switch,    // modos
+                    (double)FM_GetMode(), (double)pilot.arm_switch,         // modo activo (FM_Mode), armado
                     (double)du,(double)dw,(double)dq,(double)dtheta ,      // du, dw, dq, dtheta
 
                     (double)g_sens_data.pitot.ias_ms,                       // IAS
@@ -398,7 +418,12 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
                     (double)g_sens_data.laser.range_m,                      // Laser
 
-                    X_lat[0], X_lat[1], X_lat[2], X_lat[3], X_lat[4] );     // dv, dp, dr, dphi, dpsi
+                    X_lat[0], X_lat[1], X_lat[2], X_lat[3], X_lat[4],       // dv, dp, dr, dphi, dpsi
+
+                    g_sens_data.ahrs.phi_deg, g_sens_data.ahrs.theta_deg,   // AHRS
+                    g_sens_data.ahrs.psi_deg,
+
+                    (int)fm_status.yaw_mode );
 
             /* Flush cada 100 ms */
             if ((now_ms % 100u) == 0u) {
@@ -417,6 +442,28 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
     #endif
 }
 
+/* Estado para el FM desde los sensores (FM_State va en grados y deg/s).
+   La IMU muestrea en t = 1, 6, 11 ms y Task_5ms corre en t = 5, 10, 15 ms: los
+   giros llegan con 4 ms de antigüedad, despreciable frente a los 160 ms de
+   retardo que tolera el diseño (control_lateral.tex). */
+static FM_State fm_state_desde_sensores(const SensorsSimData *d)
+{
+    const double rad2deg = 180.0 / SENSORS_SIM_PI;
+    const FM_State st = {
+        .phi_deg   = (float)d->ahrs.phi_deg,
+        .theta_deg = (float)d->ahrs.theta_deg,
+        .psi_deg   = (float)d->ahrs.psi_deg,
+        .p_dps     = (float)(d->imu.gyro_radps.x * rad2deg),
+        .q_dps     = (float)(d->imu.gyro_radps.y * rad2deg),
+        .r_dps     = (float)(d->imu.gyro_radps.z * rad2deg),
+        .alt_m     = (float)d->gps.alt_m,
+        .vz_ms     = (float)(-d->gps.vd_ms),
+        .arsp_ms   = (float)d->pitot.ias_ms,
+        .valid     = d->imu.valid && d->ahrs.valid,
+    };
+    return st;
+}
+
 static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
 {
     (void)now_ms;
@@ -433,14 +480,14 @@ static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
     /* Flight management: sticks -> comandos de superficie. En MANUAL pasan
        sin cambios; el modo pedido se ignora si aún no está implementado. */
     FM_SetArmed(arm_cmd);
-    FM_SetMode((FM_Mode)mode_cmd);
+    FM_SetModeSwitch(mode_cmd);
     const FM_CommandsNorm fm_in = {
         .roll_norm  = g_rc_sim.s[RC_CH_ROLL],
         .pitch_norm = g_rc_sim.s[RC_CH_PITCH],
         .yaw_norm   = g_rc_sim.s[RC_CH_YAW],
         .throttle   = g_rc_sim.s[RC_CH_THROTTLE],
     };
-    const FM_State fm_st = {0};   // sin AHRS todavía: valid = false
+    const FM_State fm_st = fm_state_desde_sensores(&g_sens_data);
     FM_Update_5ms(&fm_in, &fm_st, dt_s);
 
     FM_CommandsNorm fm_out;

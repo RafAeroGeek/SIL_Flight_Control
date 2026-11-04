@@ -55,6 +55,23 @@ void FM_SetMode(FM_Mode mode)
     if (fm_modo_implementado(mode)) g_status.mode = mode;
 }
 
+void FM_SetModeSwitch(int mode_switch)
+{
+    FM_Mode    mode;
+    FM_YawMode yaw_mode;
+
+    switch (mode_switch) {
+        case 0: mode = FM_MODE_MANUAL;   yaw_mode = FM_YAW_MODE_RATE;         break;
+        case 1: mode = FM_MODE_ATTITUDE; yaw_mode = FM_YAW_MODE_RATE;         break;
+        case 2: mode = FM_MODE_ATTITUDE; yaw_mode = FM_YAW_MODE_HEADING_HOLD; break;
+        default: return;
+    }
+
+    if (!fm_modo_implementado(mode)) return;
+    g_status.mode     = mode;
+    g_status.yaw_mode = yaw_mode;
+}
+
 FM_Mode FM_GetMode(void)
 {
     return g_status.mode;

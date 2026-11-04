@@ -6,6 +6,7 @@
  *   - la salida se retiene entre corridas de FM_Update_5ms
  *   - modos no implementados o fuera de rango se ignoran
  *   - armado y status
+ *   - mapeo de mode_switch mientras ATTITUDE no está implementado
  * =========================================================== */
 #include <string.h>
 
@@ -74,6 +75,33 @@ static void test_status(void)
     EXPECT_FALSE(FM_IsArmed());
 }
 
+/* T6: mode_switch. ATTITUDE aún no está implementado: 1 y 2 no cambian ni el
+   modo ni yaw_mode, igual que un valor fuera de rango. La aceptación real se
+   prueba al implementar cada modo (F5, F6). */
+static void test_mode_switch(void)
+{
+    FM_Config cfg;
+    memset(&cfg, 0, sizeof cfg);
+    cfg.yaw_mode = FM_YAW_MODE_HEADING_HOLD;
+    FM_Init(&cfg, FM_MODE_MANUAL);
+
+    const int rechazados[] = { 1, 2, 3, -1 };
+    for (unsigned i = 0u; i < sizeof rechazados / sizeof rechazados[0]; ++i) {
+        FM_SetModeSwitch(rechazados[i]);
+
+        FM_Status s;
+        FM_GetStatus(&s);
+        EXPECT_TRUE(s.mode == FM_MODE_MANUAL);
+        EXPECT_TRUE(s.yaw_mode == FM_YAW_MODE_HEADING_HOLD);
+    }
+
+    FM_SetModeSwitch(0);
+    FM_Status s;
+    FM_GetStatus(&s);
+    EXPECT_TRUE(s.mode == FM_MODE_MANUAL);
+    EXPECT_TRUE(s.yaw_mode == FM_YAW_MODE_RATE);
+}
+
 /* T5: la salida vale cero antes de la primera corrida y luego se retiene:
    Task_1ms ve el mismo comando hasta la siguiente corrida de Task_5ms */
 static void test_retencion(void)
@@ -104,5 +132,6 @@ int main(void)
     test_modo_no_implementado();
     test_status();
     test_retencion();
+    test_mode_switch();
     TEST_RETURN();
 }

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "dynamics.h"
 #include "servo_sim.h"   /* ServoCfg_s, SERVO_SIM_N_SERVOS, ServoChannel_e */
+#include "flight_management.h"   /* FM_Config */
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +38,13 @@ bool Aircraft_LoadParams(const char *json_path, Params *out);
  */
 bool Aircraft_LoadServoCfg(const char *json_path,
                            ServoCfg_s out[SERVO_SIM_N_SERVOS]);
+
+/* Superpone las ganancias del FCS leidas de un JSON plano sobre una config que
+ * el llamador ya inicializo: solo cambian los campos cuya clave aparece; si falta
+ * una clave se avisa por stderr. En cualquier fallo (archivo faltante/vacio,
+ * plataforma RTOS) out queda intacto y se devuelve false.
+ */
+bool Aircraft_LoadFcsGains(const char *json_path, FM_Config *out);
 
 #ifdef __cplusplus
 }

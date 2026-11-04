@@ -522,6 +522,30 @@ static void SensorsSim_UpdateLaser(SensorsSim *ss)
     ss->data.laser.range_m = range;
 }
 
+static double sensors_wrap_180_deg(double ang_deg)
+{
+    return ang_deg - 360.0 * floor((ang_deg + 180.0) / 360.0);
+}
+
+static void SensorsSim_UpdateAhrs(SensorsSim *ss, const FlightSim *sim)
+{
+    if (!ss->cfg.ahrs_enabled) {
+        ss->data.ahrs.valid = false;
+        return;
+    }
+
+    const SensorsSimNoiseConfig *n = &ss->cfg.noise;
+
+    ss->data.ahrs.phi_deg = rad2deg(sensors_get_phi_rad(sim)) + n->ahrs_phi_bias_deg
+                          + sensors_noise(ss, SENSORS_RNG_AHRS, n->ahrs_att_noise_std_deg);
+    ss->data.ahrs.theta_deg = rad2deg(sensors_get_theta_rad(sim)) + n->ahrs_theta_bias_deg
+                            + sensors_noise(ss, SENSORS_RNG_AHRS, n->ahrs_att_noise_std_deg);
+    ss->data.ahrs.psi_deg = sensors_wrap_180_deg(
+                              rad2deg(sensors_get_psi_rad(sim)) + n->ahrs_psi_bias_deg
+                            + sensors_noise(ss, SENSORS_RNG_AHRS, n->ahrs_psi_noise_std_deg));
+    ss->data.ahrs.valid = true;
+}
+
 /* ============================================================
  * API pública
  * ============================================================ */
@@ -606,6 +630,7 @@ void SensorsSim_Update(SensorsSim *ss,
     SensorsSim_UpdateImu(ss, sim, dt_s);
     SensorsSim_UpdateGps(ss, sim);
     SensorsSim_UpdateLaser(ss);
+    SensorsSim_UpdateAhrs(ss, sim);
 
     ss->prev_u_ms = u;
     ss->prev_w_ms = w;

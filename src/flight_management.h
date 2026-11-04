@@ -97,13 +97,24 @@ typedef enum
 typedef enum
 {
     FM_YAW_MODE_RATE = 0,        // stick -> r_cmd (solo damping)
-    FM_YAW_MODE_HEADING_HOLD     // psi hold -> r_cmd, con override por stick
+    FM_YAW_MODE_HEADING_HOLD     // psi hold -> phi_cmd (rumbo por alabeo), con override por stick
 } FM_YawMode;
+
+/* Ganancias del control lateral (config/FCS_gains.json).
+   Diseño: docs/teoria/control/control_lateral.tex */
+typedef struct
+{
+    float K_r;       // yaw damper: r lavada -> delta_r
+    float tau_wo_s;  // constante de tiempo del washout [s]
+    float K_p;       // amortiguamiento de alabeo [s]
+    float K_phi;     // error de phi -> delta_a
+    float K_psi;     // error de rumbo -> phi_cmd
+} FM_LateralGains;
 
 typedef struct
 {
     // Envelope
-    float max_bank_deg;
+    float max_bank_deg;     // |phi_cmd| máximo, también en rumbo por alabeo
     float max_pitch_deg;
     float max_yaw_rate_dps;
     float max_roll_rate_dps;
@@ -123,9 +134,10 @@ typedef struct
 
     // Yaw behavior
     FM_YawMode yaw_mode;
-    float yaw_heading_capture_db;   // umbral de override por stick (ej. 0.05)
-    float yaw_heading_kp;           // outer loop: psi error -> r_cmd
-    float yaw_heading_rmax_dps;     // saturación r_cmd por heading hold
+    float heading_capture_db;       // banda muerta del stick de roll: fuera de ella manda el piloto
+
+    // Lazos laterales
+    FM_LateralGains lat;
 
     // Failsafe
     float failsafe_thr;     // [0,1]
@@ -149,7 +161,7 @@ typedef struct
 
     // Útil para telemetría:
     float psi_err_deg;      // heading error actual (wrap)
-    float r_cmd_from_heading_dps;
+    float phi_cmd_from_heading_deg;
 } FM_Status;
 /* ============================================================
  * Ejecuciones por cascada
@@ -170,6 +182,15 @@ void FM_Init(const FM_Config *cfg, FM_Mode initial_mode);
 /* Solo acepta modos implementados (por ahora FM_MODE_MANUAL); un modo no
    implementado o fuera de rango se ignora y el modo actual se mantiene. */
 void    FM_SetMode(FM_Mode mode);
+
+/* Mapea el switch de modo del piloto:
+     0 -> MANUAL
+     1 -> ATTITUDE + FM_YAW_MODE_RATE          (estabilizado)
+     2 -> ATTITUDE + FM_YAW_MODE_HEADING_HOLD  (rumbo)
+   Un valor fuera de rango o un modo no implementado se ignora: modo y yaw_mode
+   no cambian. */
+void    FM_SetModeSwitch(int mode_switch);
+
 FM_Mode FM_GetMode(void);
 
 /* Llamar al entrar a un modo (para capturar setpoints: psi_cmd, alt_cmd, arsp_cmd, etc.) */
