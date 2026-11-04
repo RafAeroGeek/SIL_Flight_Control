@@ -13,10 +13,10 @@
 - `main` al día con `origin/main`; PRs #1–#25 mergeados (el #19 entró en
   `feat/dpsi` y llegó a `main` con el #21). Sin ramas abiertas.
 
-### Build y tests (verificado 2026-11-02)
+### Build y tests (verificado 2026-11-04)
 - Compila con **0 warnings** `-Wall`.
-- **ctest: 11/11** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
-  `test_aircraft_loader_lat`, `test_lateral_matrices`,
+- **ctest: 12/12** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
+  `test_aircraft_loader_lat`, `test_aircraft_loader_fcs`, `test_lateral_matrices`,
   `test_pilot_lateral_servo`, `test_lon_matrices`, `test_flight_sim_trim`,
   `test_atmosphere`, `test_sensors`, `test_flight_management`).
 - **pytest: 73/73** en `main` (`dynamics/` 24 + `flightreview/` 49).
@@ -114,13 +114,14 @@ inserta algo antes de seguir.
 | F3a ✅ | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) — #20 |
 | F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto — #23 |
 | F3a++ ✅ | Software de vuelo en `Task_5ms` (`FM_Update_5ms`, modo, armado, mezcla a us); `Task_1ms` queda como mundo físico — #25 |
-| F3b | AHRS ideal con ruido + adaptar `FM_Config` (rumbo por alabeo, no por r_cmd); los giros de `FM_State` ya traen vibración. La IMU muestrea en t = 1, 6, 11 ms y `Task_5ms` corre en t = 5, 10, 15 ms: el FM lee giros con 4 ms de antigüedad; decidir aquí si se alinea |
+| F3b ✅ | AHRS ideal con ruido (σ propuestos sin medir), `FM_State` lleno en `Task_5ms`, ganancias de `config/FCS_gains.json`, `FM_Config` con rumbo por alabeo y `mode_switch` mapeado a `FM_Mode` + `FM_YawMode`. Los giros llegan con 4 ms de antigüedad, aceptado frente a los 160 ms que tolera el diseño |
 | F4 | Yaw damper; decidir aquí el filtro de giros (`p`: 0.085 rad/s RMS a 11–18 Hz; el log parece ya filtrado por ArduPilot) |
 | F5 | Modo estabilizado: wing leveler, stick → φ_cmd |
-| F6 | Heading hold + rutina de piloto con cambio de modo |
+| F6 | Heading hold + rutina de piloto con cambio de modo; bloquear el modo 2 si el yaw damper no está activo |
 | F7 | flightreview con setpoints, docs, tag `v0.4-control` |
 
-Modos (`mode_switch`): 0 MANUAL, 1 estabilizado, 2 heading hold.
+Modos (`mode_switch`): 0 MANUAL, 1 estabilizado (`ATTITUDE` + `FM_YAW_MODE_RATE`),
+2 heading hold (`ATTITUDE` + `FM_YAW_MODE_HEADING_HOLD`).
 Fuera de alcance: control longitudinal y estimador de actitud real (AHRS).
 
 ### Opcional en paralelo

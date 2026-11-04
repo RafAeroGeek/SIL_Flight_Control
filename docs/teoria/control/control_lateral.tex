@@ -399,6 +399,13 @@ Lo que las fases F3--F6 deben respetar para que el C reproduzca este diseño:
 
 \begin{itemize}
   \item \textbf{Frecuencia}: leyes en \func{Task\_5ms} (\SI{200}{Hz}).
+  \item \textbf{Ganancias}: se leen al iniciar de
+        \archivo{config/FCS\_gains.json}, con los valores de este diseño; no hay
+        vínculo automático con \archivo{dynamics/ugly\_control\_lat.json}.
+  \item \textbf{Modos}: \func{FM\_SetModeSwitch} mapea el switch: 0 a
+        \texttt{FM\_MODE\_MANUAL}; 1 a \texttt{FM\_MODE\_ATTITUDE} con
+        \texttt{FM\_YAW\_MODE\_RATE}; 2 a \texttt{FM\_MODE\_ATTITUDE} con
+        \texttt{FM\_YAW\_MODE\_HEADING\_HOLD}.
   \item \textbf{Entradas}: $p$, $r$ del giróscopo (con ruido); $\phi$, $\psi$
         del AHRS ideal. Unidades en grados o radianes indistintamente: las
         ganancias son adimensionales ($K_p$ en segundos).

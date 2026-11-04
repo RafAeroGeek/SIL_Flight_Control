@@ -10,6 +10,8 @@ Vectores de estado (ejes cuerpo):
 - Lateral-direccional: `X_lat = [dv, dp, dr, dphi]`, entradas `[delta_a, delta_r]`.
 
 Aeronave activa: `aircraft/ugly_stick.json` (ver `AIRCRAFT_JSON_PATH`).
+Ganancias del FCS: `config/FCS_gains.json` (ver `FCS_GAINS_JSON_PATH`); para agregar
+una, se añade su campo a `FM_Config` y una fila a `kFcsFields` en `aircraft_loader.c`.
 
 Las derivadas **longitudinales y laterales** de `ugly_stick.json` salen de
 `dynamics/` (estimación con Nelson a H = 1000 m, V0 = 25.25 m/s, m = 20 kg,
@@ -280,14 +282,18 @@ En `src/sim_settings.h`:
   primero, que con la convención de Nelson es δr < 0). `ROUTINE_LONGITUDINAL`
   satura el alerón a 20° y queda solo para la regresión longitudinal.
 
-El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad, dpsi_rad`.
+El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad, dpsi_rad`,
+`ahrs_phi_deg, ahrs_theta_deg, ahrs_psi_deg` (AHRS ideal) y `yaw_mode`. La columna
+`mode` registra el modo activo (`FM_Mode`), no la posición del switch.
 
 ## Pendientes conocidos
 
 - `flight_management.c` solo implementa el modo MANUAL: `Task_5ms` pasa los
-  sticks por `FM_Update_5ms` y la salida es copia exacta de la entrada. Los
-  modos con lazos (yaw damper, estabilizado, rumbo), el AHRS y los tres tiers de
-  control llegan en el Paso 4. Las tareas de 30, 150 y 500 ms en `main.c`
+  sticks por `FM_Update_5ms` y la salida es copia exacta de la entrada. `FM_State` ya
+  se llena desde los sensores y las ganancias se cargan al iniciar, pero nadie las
+  usa todavía: los modos con lazos (yaw damper, estabilizado, rumbo) y los tres
+  tiers de control llegan en el Paso 4. Por eso `mode_switch` 1 y 2 se ignoran.
+  El AHRS es ideal (actitud verdadera más ruido, sigmas propuestos sin medir). Las tareas de 30, 150 y 500 ms en `main.c`
   tampoco hacen nada todavía.
 - El throttle no realimenta la planta, y su `tau`/`rate_limit` de ESC en
   `servo_sim.c` son valores propuestos sin datos de banco.
