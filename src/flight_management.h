@@ -182,6 +182,15 @@ void FM_Init(const FM_Config *cfg, FM_Mode initial_mode);
 /* Solo acepta modos implementados (por ahora FM_MODE_MANUAL); un modo no
    implementado o fuera de rango se ignora y el modo actual se mantiene. */
 void    FM_SetMode(FM_Mode mode);
+
+/* Mapea el switch de modo del piloto:
+     0 -> MANUAL
+     1 -> ATTITUDE + FM_YAW_MODE_RATE          (estabilizado)
+     2 -> ATTITUDE + FM_YAW_MODE_HEADING_HOLD  (rumbo)
+   Un valor fuera de rango o un modo no implementado se ignora: modo y yaw_mode
+   no cambian. */
+void    FM_SetModeSwitch(int mode_switch);
+
 FM_Mode FM_GetMode(void);
 
 /* Llamar al entrar a un modo (para capturar setpoints: psi_cmd, alt_cmd, arsp_cmd, etc.) */
