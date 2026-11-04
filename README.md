@@ -181,8 +181,9 @@ columnas del pitot (`pitot_ms`, `tas_ms`, `dp_pa`: V = √(u²+v²+w²) incluye 
 v a segundo orden). Cada sensor tiene su propia secuencia de ruido, así que agregar o
 quitar ruido en uno no cambia las columnas de los demás.
 
-La línea base vigente es `2632b23` (IMU con el ruido del log de vuelo; frente a
-`b48585b` solo cambian giros y acelerómetros); las anteriores ya no aplican.
+La línea base vigente es `857cec7` (software de vuelo en `Task_5ms`; frente a
+`2632b23`, estados, servos y comandos quedan desplazados exactamente 1 ms); las
+anteriores ya no aplican.
 
 ## Documentación teórica (`docs/teoria/`)
 
@@ -283,10 +284,10 @@ El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad, dpsi_
 
 ## Pendientes conocidos
 
-- `flight_management.c` solo implementa el modo MANUAL: `Task_1ms` pasa los
-  sticks por `FM_Update` y la salida es copia exacta de la entrada. Los modos
-  con lazos (yaw damper, estabilizado, rumbo), el AHRS y los tres tiers de
-  control llegan en el Paso 4. Las tareas de 5, 30, 150 y 500 ms en `main.c`
+- `flight_management.c` solo implementa el modo MANUAL: `Task_5ms` pasa los
+  sticks por `FM_Update_5ms` y la salida es copia exacta de la entrada. Los
+  modos con lazos (yaw damper, estabilizado, rumbo), el AHRS y los tres tiers de
+  control llegan en el Paso 4. Las tareas de 30, 150 y 500 ms en `main.c`
   tampoco hacen nada todavía.
 - El throttle no realimenta la planta, y su `tau`/`rate_limit` de ESC en
   `servo_sim.c` son valores propuestos sin datos de banco.

@@ -20,9 +20,9 @@
   `test_pilot_lateral_servo`, `test_lon_matrices`, `test_flight_sim_trim`,
   `test_atmosphere`, `test_sensors`, `test_flight_management`).
 - **pytest: 73/73** en `main` (`dynamics/` 24 + `flightreview/` 49).
-- Línea base de regresión vigente: `data/baseline_2632b23.csv` (local, no
-  trackeada). Frente a `b48585b` solo cambian los 6 canales de la IMU. Las
-  anteriores ya no aplican.
+- Línea base de regresión vigente: `data/baseline_857cec7.csv` (local, no
+  trackeada). Frente a `2632b23`, estados, servos y comandos quedan desplazados
+  exactamente 1 ms, bit a bit. Las anteriores ya no aplican.
 - Documentación teórica en `docs/teoria/` (LaTeX):
   `sensores/ruido_sensores.tex` y `control/control_lateral.tex`.
 
@@ -76,7 +76,7 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 ### Media prioridad
 | # | Pendiente |
 |---|---|
-| 5.1 / 8.9 | Modos con lazos en `flight_management.c` y tareas 5/30/150/500 ms de `main.c` vacías → Paso 4 (F3b–F6) |
+| 5.1 / 8.9 | Modos con lazos en `flight_management.c` y tareas 30/150/500 ms de `main.c` vacías → Paso 4 (F3b–F6) |
 | 8.12 | Validar inercias (I_x, I_y, I_z), factores empíricos y σ de pitot/veleta con datos de banco y de vuelo; contrastar la vibración medida de la IMU con más vuelos (un solo log: ±50 % en potencia media) |
 | 4.3 | Del `.bin` de ArduPilot: filtros `INS_*_FILTER`, throttle y RPM; agregar `imu_noise_analysis.py` y `sensors_data.csv` para reproducir el ajuste |
 | 8.2 | Contrastar derivadas de control del Navion con Nelson apéndice B |
@@ -113,7 +113,8 @@ inserta algo antes de seguir.
 | F2 ✅ | Diseño de ganancias en Python (clásico en cascada, ζ_DR ≥ 0.4, espiral estable) + `docs/teoria/control/control_lateral.tex` |
 | F3a ✅ | Infraestructura de `flight_management` (MANUAL pass-through, bit a bit) — #20 |
 | F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto — #23 |
-| F3b | AHRS ideal con ruido + adaptar `FM_Config` (rumbo por alabeo, no por r_cmd); los giros de `FM_State` ya traen vibración |
+| F3a++ | Software de vuelo en `Task_5ms` (`FM_Update_5ms`, modo, armado, mezcla a us); `Task_1ms` queda como mundo físico |
+| F3b | AHRS ideal con ruido + adaptar `FM_Config` (rumbo por alabeo, no por r_cmd); los giros de `FM_State` ya traen vibración. La IMU muestrea en t = 1, 6, 11 ms y `Task_5ms` corre en t = 5, 10, 15 ms: el FM lee giros con 4 ms de antigüedad; decidir aquí si se alinea |
 | F4 | Yaw damper; decidir aquí el filtro de giros (`p`: 0.085 rad/s RMS a 11–18 Hz; el log parece ya filtrado por ArduPilot) |
 | F5 | Modo estabilizado: wing leveler, stick → φ_cmd |
 | F6 | Heading hold + rutina de piloto con cambio de modo |
