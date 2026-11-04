@@ -430,6 +430,28 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
     #endif
 }
 
+/* Estado para el FM desde los sensores (FM_State va en grados y deg/s).
+   La IMU muestrea en t = 1, 6, 11 ms y Task_5ms corre en t = 5, 10, 15 ms: los
+   giros llegan con 4 ms de antigüedad, despreciable frente a los 160 ms de
+   retardo que tolera el diseño (control_lateral.tex). */
+static FM_State fm_state_desde_sensores(const SensorsSimData *d)
+{
+    const double rad2deg = 180.0 / SENSORS_SIM_PI;
+    const FM_State st = {
+        .phi_deg   = (float)d->ahrs.phi_deg,
+        .theta_deg = (float)d->ahrs.theta_deg,
+        .psi_deg   = (float)d->ahrs.psi_deg,
+        .p_dps     = (float)(d->imu.gyro_radps.x * rad2deg),
+        .q_dps     = (float)(d->imu.gyro_radps.y * rad2deg),
+        .r_dps     = (float)(d->imu.gyro_radps.z * rad2deg),
+        .alt_m     = (float)d->gps.alt_m,
+        .vz_ms     = (float)(-d->gps.vd_ms),
+        .arsp_ms   = (float)d->pitot.ias_ms,
+        .valid     = d->imu.valid && d->ahrs.valid,
+    };
+    return st;
+}
+
 static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
 {
     (void)now_ms;
@@ -453,7 +475,7 @@ static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
         .yaw_norm   = g_rc_sim.s[RC_CH_YAW],
         .throttle   = g_rc_sim.s[RC_CH_THROTTLE],
     };
-    const FM_State fm_st = {0};   // sin AHRS todavía: valid = false
+    const FM_State fm_st = fm_state_desde_sensores(&g_sens_data);
     FM_Update_5ms(&fm_in, &fm_st, dt_s);
 
     FM_CommandsNorm fm_out;
