@@ -1,7 +1,7 @@
 # Status del proyecto — SIL_Flight_Control
 
 **Fecha de revisión:** 2026-11-04
-**Último commit en `main`:** `cb6847d` Merge PR #26 (F3b: entradas y configuración de los lazos)
+**Último commit en `main`:** `13493f2` Merge PR #27 (F4: yaw damper y filtro de giros)
 **Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`), `v0.3-dynamics` (2026-10-22, `717c056`)
 **Versión en `CMakeLists.txt`:** 0.3.0
 
@@ -10,7 +10,7 @@
 ## 1. Estado actual
 
 ### Git
-- `main` al día con `origin/main`; PRs #1–#26 mergeados (el #19 entró en
+- `main` al día con `origin/main`; PRs #1–#27 mergeados (el #19 entró en
   `feat/dpsi` y llegó a `main` con el #21). Sin ramas abiertas.
 
 ### Build y tests (verificado 2026-11-04)
@@ -20,7 +20,7 @@
   `test_yaw_damper_cl`, `test_lateral_matrices`,
   `test_pilot_lateral_servo`, `test_lon_matrices`, `test_flight_sim_trim`,
   `test_atmosphere`, `test_sensors`, `test_flight_management`).
-- **pytest: 79/79** (`dynamics/` 24 + `flightreview/` 55).
+- **pytest: 82/82** (`dynamics/` 24 + `flightreview/` 58).
 - Línea base de regresión vigente: `data/baseline_857cec7.csv` (local, no
   trackeada). Frente a `2632b23`, estados, servos y comandos quedan desplazados
   exactamente 1 ms, bit a bit. Las anteriores ya no aplican.
@@ -116,8 +116,9 @@ inserta algo antes de seguir.
 | F3a+ ✅ | Ruido de IMU desde vuelos de prueba (TODO 4.2): modelo completo a 200 Hz con retención, `m = 1` por defecto — #23 |
 | F3a++ ✅ | Software de vuelo en `Task_5ms` (`FM_Update_5ms`, modo, armado, mezcla a us); `Task_1ms` queda como mundo físico — #25 |
 | F3b ✅ | AHRS ideal con ruido (σ propuestos sin medir), `FM_State` lleno en `Task_5ms`, ganancias de `config/FCS_gains.json`, `FM_Config` con rumbo por alabeo y `mode_switch` mapeado a `FM_Mode` + `FM_YawMode`. Los giros llegan con 4 ms de antigüedad, aceptado frente a los 160 ms que tolera el diseño — #26 |
-| F4 ✅ | Yaw damper en `FM_MODE_GYRO_STAB` (`mode_switch` 3); filtro de 1er orden de giros en `Task_5ms`, corte por eje en `config/FCS_gains.json`; subpestaña "Filtro giros" en flightreview |
-| F5 | Modo estabilizado: wing leveler, stick → φ_cmd |
+| F4 ✅ | Yaw damper en `FM_MODE_GYRO_STAB` (`mode_switch` 3); filtro de 1er orden de giros en `Task_5ms`, corte por eje en `config/FCS_gains.json`; subpestaña "Filtro giros" en flightreview — #27 |
+| F4+ | Filtro de la IAS del pitot en `Task_5ms` (5 Hz, `pitot_fc_hz`), listo para leerse en `Task_30ms`; `pitot_ms_filtered` en el CSV y en flightreview |
+| F5 | Modo estabilizado: wing leveler, stick → φ_cmd; saturación y límite de velocidad a la salida del FM (`fm_slew_limit`, protección, no filtro de ruido); ajustar el corte de `p` |
 | F6 | Heading hold + rutina de piloto con cambio de modo; bloquear el modo 2 si el yaw damper no está activo |
 | F7 | flightreview con setpoints, docs, tag `v0.4-control` |
 

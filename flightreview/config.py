@@ -55,6 +55,8 @@ FIELD_ALIASES: dict[str, list[str]] = {
 
     # --- Extras utiles (no usados por el MVP, pero el parser los resuelve) ---
     "airspeed": ["pitot_ms", "airspeed_ms", "ARSP", "pitot_airspeed_ms"],   # IAS
+    "airspeed_filt": ["pitot_ms_filtered"],                                 # IAS filtrada
+    "airspeed_fc": ["pitot_fc_hz"],
     "tas": ["tas_ms", "TAS", "true_airspeed_ms"],
     "diff_pressure": ["dp_pa", "diff_pressure_pa"],
 

@@ -27,6 +27,7 @@ add_executable(SIL_Flight_Control
     src/flight_management.c
     src/flight_sim.c
     src/gyro_filter.c
+    src/lpf1.c
     src/pilot_sim.c
     src/sensors_sim.c
     src/servo_sim.c
@@ -121,6 +122,7 @@ if(SIL_BUILD_TESTS)
     add_executable(test_gyro_filter
         test/test_gyro_filter.c
         src/gyro_filter.c
+        src/lpf1.c
         src/dynamics.c
     )
     target_include_directories(test_gyro_filter PRIVATE src test)

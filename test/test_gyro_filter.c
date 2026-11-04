@@ -1,6 +1,6 @@
 /* ===========================================================
  * test_gyro_filter.c
- * Cubre gyro_filter.c:
+ * Cubre gyro_filter.c y lpf1.c:
  *   - respuesta al escalón igual a la solución exacta de 1er orden
  *   - ganancia y fase en la frecuencia de corte
  *   - fc = 0 sin filtro; fc > máximo limitado; ejes independientes
@@ -95,9 +95,9 @@ static void test_configuracion(void)
     GyroFilter f;
 
     GyroFilter_Init(&f, fc);
-    EXPECT_FLOAT_EQ(f.fc_hz[0], 0.0f);
-    EXPECT_FLOAT_EQ(f.fc_hz[1], GYRO_FILTER_FC_MAX_HZ);
-    EXPECT_FLOAT_EQ(f.fc_hz[2], 5.0f);
+    EXPECT_FLOAT_EQ(f.eje[0].fc_hz, 0.0f);
+    EXPECT_FLOAT_EQ(f.eje[1].fc_hz, LPF1_FC_MAX_HZ);
+    EXPECT_FLOAT_EQ(f.eje[2].fc_hz, 5.0f);
 
     GyroFilter_Update(&f, cero, DT_S, y);
     GyroFilter_Update(&f, uno, DT_S, y);
@@ -106,11 +106,30 @@ static void test_configuracion(void)
     EXPECT_TRUE(y[2] > 0.0 && y[2] < 1.0);
 }
 
+/* T5: Lpf1 suelto: primera muestra, escalón a 5 Hz y fc = 0 */
+static void test_lpf1(void)
+{
+    const double tau = 1.0 / (2.0 * PI_D * 5.0);
+    Lpf1 f;
+
+    Lpf1_Init(&f, 5.0f);
+    EXPECT_TRUE(cerca(Lpf1_Update(&f, 24.0, DT_S), 24.0, 1e-12));
+    for (int k = 1; k <= 100; ++k) {
+        const double y = Lpf1_Update(&f, 25.0, DT_S);
+        EXPECT_TRUE(cerca(y, 25.0 - exp(-k * DT_S / tau), 1e-4));
+    }
+
+    Lpf1_Init(&f, 0.0f);
+    (void)Lpf1_Update(&f, 1.0, DT_S);
+    EXPECT_TRUE(Lpf1_Update(&f, 3.0, DT_S) == 3.0);
+}
+
 int main(void)
 {
     test_primera_muestra();
     test_escalon();
     test_corte();
     test_configuracion();
+    test_lpf1();
     TEST_RETURN();
 }

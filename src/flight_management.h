@@ -61,7 +61,7 @@ typedef struct
 
     float alt_m;
     float vz_ms;
-    float arsp_ms;
+    float arsp_ms;           // IAS filtrada [m/s]
 
     bool  valid;
 } FM_State;
@@ -144,6 +144,9 @@ typedef struct
 
     // Corte del filtro de giros [Hz], ejes x, y, z; 0 = sin filtro
     float gyro_fc_hz[3];
+
+    // Corte del filtro de la velocidad del pitot [Hz]; 0 = sin filtro
+    float pitot_fc_hz;
 
     // Failsafe
     float failsafe_thr;     // [0,1]
