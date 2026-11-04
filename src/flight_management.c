@@ -70,9 +70,9 @@ bool FM_IsArmed(void)
     return g_status.armed;
 }
 
-void FM_Update(const FM_CommandsNorm *rc_cmd,
-               const FM_State        *st,
-               float                  dt_s)
+void FM_Update_5ms(const FM_CommandsNorm *rc_cmd,
+                   const FM_State        *st,
+                   float                  dt_s)
 {
     (void)st; (void)dt_s;   // los usan los modos con lazos (F4+)
     if (rc_cmd == NULL) return;

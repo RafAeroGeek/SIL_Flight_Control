@@ -183,9 +183,9 @@ void FM_SetFailsafe(bool enabled);
 void FM_ResetIntegrators(void);
 
 /* Nota: rc_cmd->throttle ya viene en [0,1] */
-void FM_Update(const FM_CommandsNorm *rc_cmd,
-               const FM_State        *st,
-               float                  dt_s);
+void FM_Update_5ms(const FM_CommandsNorm *rc_cmd,
+                   const FM_State        *st,
+                   float                  dt_s);
 
 /* Comandos de salida normalizados (misma escala que FM_CommandsNorm de
    entrada): el ruteo a servos (signo del timón, trim, us) sigue fuera, en
