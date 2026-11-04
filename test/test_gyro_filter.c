@@ -1,6 +1,6 @@
 /* ===========================================================
  * test_gyro_filter.c
- * Cubre gyro_filter.c:
+ * Cubre gyro_filter.c y lpf1.c:
  *   - respuesta al escalón igual a la solución exacta de 1er orden
  *   - ganancia y fase en la frecuencia de corte
  *   - fc = 0 sin filtro; fc > máximo limitado; ejes independientes
@@ -95,9 +95,9 @@ static void test_configuracion(void)
     GyroFilter f;
 
     GyroFilter_Init(&f, fc);
-    EXPECT_FLOAT_EQ(f.fc_hz[0], 0.0f);
-    EXPECT_FLOAT_EQ(f.fc_hz[1], GYRO_FILTER_FC_MAX_HZ);
-    EXPECT_FLOAT_EQ(f.fc_hz[2], 5.0f);
+    EXPECT_FLOAT_EQ(f.eje[0].fc_hz, 0.0f);
+    EXPECT_FLOAT_EQ(f.eje[1].fc_hz, LPF1_FC_MAX_HZ);
+    EXPECT_FLOAT_EQ(f.eje[2].fc_hz, 5.0f);
 
     GyroFilter_Update(&f, cero, DT_S, y);
     GyroFilter_Update(&f, uno, DT_S, y);

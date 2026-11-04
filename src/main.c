@@ -199,7 +199,7 @@ void task_init_1ms(void)
                fm_cfg.lat.K_r, fm_cfg.lat.tau_wo_s, fm_cfg.lat.K_p,
                fm_cfg.lat.K_phi, fm_cfg.lat.K_psi, fm_cfg.max_bank_deg);
         printf("Filtro de giros: fc = %.1f, %.1f, %.1f Hz\n",
-               g_gyro_filter.fc_hz[0], g_gyro_filter.fc_hz[1], g_gyro_filter.fc_hz[2]);
+               g_gyro_filter.eje[0].fc_hz, g_gyro_filter.eje[1].fc_hz, g_gyro_filter.eje[2].fc_hz);
 
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
@@ -441,8 +441,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     (int)fm_status.yaw_mode,
 
                     g_gyro_filt_radps[0], g_gyro_filt_radps[1], g_gyro_filt_radps[2],
-                    (double)g_gyro_filter.fc_hz[0], (double)g_gyro_filter.fc_hz[1],
-                    (double)g_gyro_filter.fc_hz[2],
+                    (double)g_gyro_filter.eje[0].fc_hz, (double)g_gyro_filter.eje[1].fc_hz,
+                    (double)g_gyro_filter.eje[2].fc_hz,
 
                     (double)fm_status.yd_r_wo_dps, (double)fm_status.yd_dr_deg );
 
