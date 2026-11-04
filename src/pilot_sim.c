@@ -46,6 +46,20 @@ pilotcommand_s pilot_source_commands(uint32_t now_ms, unsigned id_routine)
 
             current_commands.flaps      = 0.0;
             break;
+        case ROUTINE_YAW_DAMPER:
+            /* Mismo doblete de timón (0.03 de stick) en MANUAL, de 1.0 a 3.0 s, y
+               con el yaw damper, de 6.0 a 8.0 s. El modo cambia a 5.0 s. */
+            current_commands.roll       = 0.0;
+            current_commands.pitch      = 0.0;
+            current_commands.yaw        = step_cmd(now_ms, 1000u, 0.03) + step_cmd(now_ms, 2000u, -0.06) + step_cmd(now_ms, 3000u, 0.03)
+                                        + step_cmd(now_ms, 6000u, 0.03) + step_cmd(now_ms, 7000u, -0.06) + step_cmd(now_ms, 8000u, 0.03);
+            current_commands.throttle   = 0.0;
+
+            current_commands.mode_switch= (now_ms >= 5000u) ? 3 : 0;
+            current_commands.arm_switch = 0;
+
+            current_commands.flaps      = 0.0;
+            break;
         case ROUTINE_ESTATICA:
             current_commands.roll       = 0.0;
             current_commands.pitch      = 0.0;

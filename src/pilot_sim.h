@@ -27,6 +27,7 @@ typedef enum
     ROUTINE_LONGITUDINAL = 1,   // roll + pitch: rutina de regresión actual
     ROUTINE_ESTATICA     = 2,   // todo a cero (compat con el case 2 previo)
     ROUTINE_LAT_DIR      = 3,   // escalones de yaw y throttle
+    ROUTINE_YAW_DAMPER   = 4,   // mismo doblete de timón en MANUAL y en GYRO_STAB
     ROUTINE_COUNT
 } RoutineID;
 
