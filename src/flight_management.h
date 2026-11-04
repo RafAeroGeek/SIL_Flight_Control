@@ -139,6 +139,9 @@ typedef struct
     // Lazos laterales
     FM_LateralGains lat;
 
+    // Corte del filtro de giros [Hz], ejes x, y, z; 0 = sin filtro
+    float gyro_fc_hz[3];
+
     // Failsafe
     float failsafe_thr;     // [0,1]
 } FM_Config;

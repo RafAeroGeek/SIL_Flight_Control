@@ -4,5 +4,8 @@
   "K_p": 0.1,
   "K_phi": 0.8,
   "K_psi": 1.0,
-  "phi_max_deg": 30.0
+  "phi_max_deg": 30.0,
+  "gyro_roll_rate_fc_hz": 20.0,
+  "gyro_pitch_rate_fc_hz": 20.0,
+  "gyro_yaw_rate_fc_hz": 20.0
 }

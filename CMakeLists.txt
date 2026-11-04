@@ -26,6 +26,7 @@ add_executable(SIL_Flight_Control
     src/atmosphere.c
     src/flight_management.c
     src/flight_sim.c
+    src/gyro_filter.c
     src/pilot_sim.c
     src/sensors_sim.c
     src/servo_sim.c
@@ -116,6 +117,16 @@ if(SIL_BUILD_TESTS)
         TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}"
     )
     add_test(NAME test_aircraft_loader_fcs COMMAND test_aircraft_loader_fcs)
+
+    add_executable(test_gyro_filter
+        test/test_gyro_filter.c
+        src/gyro_filter.c
+        src/dynamics.c
+    )
+    target_include_directories(test_gyro_filter PRIVATE src test)
+    target_compile_options(test_gyro_filter PRIVATE -Wall)
+    target_link_libraries(test_gyro_filter PRIVATE m)
+    add_test(NAME test_gyro_filter COMMAND test_gyro_filter)
 
     add_executable(test_lateral_matrices
         test/test_lateral_matrices.c
