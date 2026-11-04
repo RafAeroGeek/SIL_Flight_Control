@@ -3,6 +3,7 @@
  * Cubre la infraestructura de flight_management.c en modo MANUAL:
  *   - FM_Init arranca en MANUAL y desarmado
  *   - paso directo bit a bit de los sticks (salida == entrada)
+ *   - la salida se retiene entre corridas de FM_Update_5ms
  *   - modos no implementados o fuera de rango se ignoran
  *   - armado y status
  * =========================================================== */
@@ -28,7 +29,7 @@ static void test_init(void)
     EXPECT_TRUE(FM_GetMode() == FM_MODE_MANUAL);
 }
 
-/* T2: MANUAL copia los sticks sin tocarlos (regresión bit a bit en main.c) */
+/* T2: MANUAL copia los sticks sin tocarlos */
 static void test_paso_directo(void)
 {
     FM_Init(NULL, FM_MODE_MANUAL);
@@ -73,11 +74,35 @@ static void test_status(void)
     EXPECT_FALSE(FM_IsArmed());
 }
 
+/* T5: la salida vale cero antes de la primera corrida y luego se retiene:
+   Task_1ms ve el mismo comando hasta la siguiente corrida de Task_5ms */
+static void test_retencion(void)
+{
+    FM_Init(NULL, FM_MODE_MANUAL);
+
+    FM_CommandsNorm out;
+    FM_GetCmdOut(&out);
+    EXPECT_FLOAT_EQ(out.roll_norm,  0.0f);
+    EXPECT_FLOAT_EQ(out.pitch_norm, 0.0f);
+    EXPECT_FLOAT_EQ(out.yaw_norm,   0.0f);
+    EXPECT_FLOAT_EQ(out.throttle,   0.0f);
+
+    const FM_State st = {0};
+    FM_Update_5ms(&k_cmd, &st, 0.005f);
+    FM_GetCmdOut(&out);
+    EXPECT_TRUE(memcmp(&out, &k_cmd, sizeof out) == 0);
+
+    /* Otra lectura sin nueva corrida: mismo comando */
+    FM_GetCmdOut(&out);
+    EXPECT_TRUE(memcmp(&out, &k_cmd, sizeof out) == 0);
+}
+
 int main(void)
 {
     test_init();
     test_paso_directo();
     test_modo_no_implementado();
     test_status();
+    test_retencion();
     TEST_RETURN();
 }

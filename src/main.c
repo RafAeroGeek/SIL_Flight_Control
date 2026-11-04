@@ -29,6 +29,9 @@ static FM_Actuators g_act;
 static SensorsSim g_sensors;
 static SensorsSimData g_sens_data;
 
+/* Canales RC del piloto: los escribe Task_1ms y los lee Task_5ms. */
+static SimRc_s g_rc_sim;
+
 /* Trim del transmisor [us], uno por servo: el comando del piloto se suma a
    este offset para que con el stick al centro la superficie quede en su
    delta_*_trim_deg. Se calcula en task_init_1ms. */
@@ -161,6 +164,12 @@ void task_init_1ms(void)
     aplicar_trim_servo(servo_cfg, SERVO_RUDDER,   g_params.delta_r_trim_deg);
     Servos_Init_All_Cfg(servo_cfg);
 
+    /* Comando inicial = trim (sticks al centro). Sin esto el servo recibe 0 us
+       hasta la primera corrida de Task_5ms (t = 5 ms) y se aleja del trim. */
+    for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
+        Servos_SetCmdDeltaUs(i, g_trim_us[i]);
+    }
+
     #if(SYSTEM_SIM_ENV == SIM_PLATFORM_PC)
         /* 4) (Opcional) imprimir A,B desde el sim */
 
@@ -279,50 +288,12 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
     const float dt_s = (float)dt_ms * 0.001f;
     const float t_s = (float)now_ms * 0.001f;
     static pilotcommand_s pilot;
-    SimRc_s rc_sim = {0};
 
      /* Comandos ejemplo (delta PWM us respecto a 1500) */
 
      pilot = pilot_source_commands(now_ms, SIM_PILOT_ROUTINE);
 
-     rc_sim = rc_source(pilot);
-
-     /* Opcional: flaps, modo, armado */
-     float flaps_cmd    = rc_sim.s[RC_CH_FLAPS];
-     int mode_cmd       = (int)rc_sim.s[RC_CH_MODE];
-     bool arm_cmd       = (rc_sim.s[RC_CH_ARM] > 0.5f);
-     (void)flaps_cmd;  // sin superficie de flaps en la planta
-
-     /* Flight management: sticks -> comandos de superficie. En MANUAL pasan
-        sin cambios; el modo pedido se ignora si aún no está implementado.
-        Corre a 1 ms para no meter retardo entre el piloto y los servos. */
-     FM_SetArmed(arm_cmd);
-     FM_SetMode((FM_Mode)mode_cmd);
-     const FM_CommandsNorm fm_in = {
-         .roll_norm  = rc_sim.s[RC_CH_ROLL],
-         .pitch_norm = rc_sim.s[RC_CH_PITCH],
-         .yaw_norm   = rc_sim.s[RC_CH_YAW],
-         .throttle   = rc_sim.s[RC_CH_THROTTLE],
-     };
-     const FM_State fm_st = {0};   // sin AHRS todavía: valid = false
-     FM_Update_5ms(&fm_in, &fm_st, dt_s);
-
-     FM_CommandsNorm fm_out;
-     FM_GetCmdOut(&fm_out);
-     SimRc_s rc_fm = rc_sim;
-     rc_fm.s[RC_CH_ROLL]     = fm_out.roll_norm;
-     rc_fm.s[RC_CH_PITCH]    = fm_out.pitch_norm;
-     rc_fm.s[RC_CH_YAW]      = fm_out.yaw_norm;
-     rc_fm.s[RC_CH_THROTTLE] = fm_out.throttle;
-
-     /* Canales -> delta PWM [us] por servo, con trim del transmisor */
-     float servo_cmd_us[SERVO_SIM_N_SERVOS];
-     rc_to_servo_cmds_us(&rc_fm, g_trim_us, servo_cmd_us);
-
-     /* Enviar comandos a los servos/actuadores */
-     for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
-         Servos_SetCmdDeltaUs(i, servo_cmd_us[i]);
-     }
+     g_rc_sim = rc_source(pilot);
 
      /* “Tarea” 1 ms */
      Servos_Update_1ms();
@@ -389,11 +360,11 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     (double)t_s,                                            // 1. tiempo
                     (double)u_elev, (double)u_ail,                          // comandos us
                     (double)u_rud,  (double)u_thro,
-                    (double)rc_sim.s[RC_CH_PITCH],                          // 6. valores RC
-                    (double)rc_sim.s[RC_CH_ROLL],
-                    (double)rc_sim.s[RC_CH_YAW],
-                    (double)rc_sim.s[RC_CH_THROTTLE],
-                    (double)rc_sim.s[RC_CH_FLAPS],
+                    (double)g_rc_sim.s[RC_CH_PITCH],                          // 6. valores RC
+                    (double)g_rc_sim.s[RC_CH_ROLL],
+                    (double)g_rc_sim.s[RC_CH_YAW],
+                    (double)g_rc_sim.s[RC_CH_THROTTLE],
+                    (double)g_rc_sim.s[RC_CH_FLAPS],
                     g_act.elevator, g_act.aileron,                          //11. salidas deg servo - superficie d control
                     g_act.rudder,  g_act.throttle,
                     (double)u_elev, (double)u_ail,                          // 15. señal norm servos deg
@@ -450,13 +421,44 @@ static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
 {
     (void)now_ms;
     const float dt_s = (float)dt_ms * 0.001f;
-    (void)dt_s;  // se usara en los inner loops (v0.3)
 
-    /* Inner loops (rate) o “control layer” rápida */
+    /* Software de vuelo (lo que correria en el embebido). Toma los canales RC
+       que Task_1ms ya actualizo en este tick; el servo retiene el comando 5 ms
+       y lo ve a partir del siguiente tick. */
+    float flaps_cmd    = g_rc_sim.s[RC_CH_FLAPS];
+    int mode_cmd       = (int)g_rc_sim.s[RC_CH_MODE];
+    bool arm_cmd       = (g_rc_sim.s[RC_CH_ARM] > 0.5f);
+    (void)flaps_cmd;  // sin superficie de flaps en la planta
 
+    /* Flight management: sticks -> comandos de superficie. En MANUAL pasan
+       sin cambios; el modo pedido se ignora si aún no está implementado. */
+    FM_SetArmed(arm_cmd);
+    FM_SetMode((FM_Mode)mode_cmd);
+    const FM_CommandsNorm fm_in = {
+        .roll_norm  = g_rc_sim.s[RC_CH_ROLL],
+        .pitch_norm = g_rc_sim.s[RC_CH_PITCH],
+        .yaw_norm   = g_rc_sim.s[RC_CH_YAW],
+        .throttle   = g_rc_sim.s[RC_CH_THROTTLE],
+    };
+    const FM_State fm_st = {0};   // sin AHRS todavía: valid = false
+    FM_Update_5ms(&fm_in, &fm_st, dt_s);
 
-    /* Aplicar a planta (en sim, normalmente lo haces en 1ms como ZOH) */
-    /* Plant_SetActuators(g_act); */
+    FM_CommandsNorm fm_out;
+    FM_GetCmdOut(&fm_out);
+    SimRc_s rc_fm = g_rc_sim;
+    rc_fm.s[RC_CH_ROLL]     = fm_out.roll_norm;
+    rc_fm.s[RC_CH_PITCH]    = fm_out.pitch_norm;
+    rc_fm.s[RC_CH_YAW]      = fm_out.yaw_norm;
+    rc_fm.s[RC_CH_THROTTLE] = fm_out.throttle;
+
+    /* Canales -> delta PWM [us] por servo, con trim del transmisor */
+    float servo_cmd_us[SERVO_SIM_N_SERVOS];
+    rc_to_servo_cmds_us(&rc_fm, g_trim_us, servo_cmd_us);
+
+    /* Enviar comandos a los servos/actuadores */
+    for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
+        Servos_SetCmdDeltaUs(i, servo_cmd_us[i]);
+    }
 }
 
 static void Task_30ms(uint32_t now_ms, uint32_t dt_ms)
