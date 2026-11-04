@@ -104,6 +104,7 @@ void task_init_1ms(void)
     scfg.imu_enabled   = true;
     scfg.gps_enabled   = true;
     scfg.laser_enabled = true;
+    scfg.ahrs_enabled  = true;
 
     scfg.random_seed = 1234u;
 
@@ -141,6 +142,13 @@ void task_init_1ms(void)
 
     scfg.noise.laser_noise_std_m = 0.03;
     scfg.noise.laser_bias_m      = 0.0;
+
+    /* AHRS ideal: sigmas PROPUESTOS - REVISAR (sin datos medidos) */
+    scfg.noise.ahrs_att_noise_std_deg = 0.2;
+    scfg.noise.ahrs_psi_noise_std_deg = 0.5;
+    scfg.noise.ahrs_phi_bias_deg      = 0.0;
+    scfg.noise.ahrs_theta_bias_deg    = 0.0;
+    scfg.noise.ahrs_psi_bias_deg      = 0.0;
 
     SensorsSim_Init(&g_sensors, &scfg, &g_sim);
 
@@ -205,7 +213,8 @@ void task_init_1ms(void)
                         "gps_lat_deg,gps_lon_deg,gps_alt_m,"                // GPS data
                         "gps_vn_ms,gps_ve_ms,gps_vd_ms,"
                         "laser_alt_m,"                                      // Laser
-                        "dv_mps,dp_radps,dr_radps,dphi_rad,dpsi_rad\n" );   // Estado lateral-direccional
+                        "dv_mps,dp_radps,dr_radps,dphi_rad,dpsi_rad,"       // Estado lateral-direccional
+                        "ahrs_phi_deg,ahrs_theta_deg,ahrs_psi_deg\n" );     // AHRS ideal
 
             fflush(g_fp);
             printf("CSV abierto: %s\n", csv_path);
@@ -356,7 +365,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.7f,%.7f,%.3f,"       // gps lat, lon [deg] (1e-7 deg ~ 1 cm), alt
                     "%.3f,%.3f,%.3f,"       // gps vn ve vd
                     "%.6f,"                 // Laser
-                    "%.6f,%.6f,%.6f,%.6f,%.6f\n", // dv, dp, dr, dphi, dpsi
+                    "%.6f,%.6f,%.6f,%.6f,%.6f,"  // dv, dp, dr, dphi, dpsi
+                    "%.6f,%.6f,%.6f\n",          // AHRS phi, theta, psi [deg]
                     (double)t_s,                                            // 1. tiempo
                     (double)u_elev, (double)u_ail,                          // comandos us
                     (double)u_rud,  (double)u_thro,
@@ -398,7 +408,10 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
                     (double)g_sens_data.laser.range_m,                      // Laser
 
-                    X_lat[0], X_lat[1], X_lat[2], X_lat[3], X_lat[4] );     // dv, dp, dr, dphi, dpsi
+                    X_lat[0], X_lat[1], X_lat[2], X_lat[3], X_lat[4],       // dv, dp, dr, dphi, dpsi
+
+                    g_sens_data.ahrs.phi_deg, g_sens_data.ahrs.theta_deg,   // AHRS
+                    g_sens_data.ahrs.psi_deg );
 
             /* Flush cada 100 ms */
             if ((now_ms % 100u) == 0u) {

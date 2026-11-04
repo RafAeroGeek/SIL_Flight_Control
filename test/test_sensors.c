@@ -7,6 +7,8 @@
  *   - veleta: alpha = atan2(w, u) en el trim; ruido de 0.5° en alpha y beta
  *   - IMU: verdad sin ruido, sigma del piso y de vuelo, retención a 200 Hz,
  *     misma semilla -> misma salida, y aislamiento de los demás sensores
+ *   - AHRS: verdad sin ruido más bias, envoltura de psi, sigma configurada y
+ *     aislamiento de los demás sensores
  * =========================================================== */
 #include <math.h>
 #include <string.h>
@@ -329,6 +331,93 @@ static void test_imu_aislada(void)
     }
 }
 
+/* T11: AHRS sin ruido -> actitud verdadera más bias, con psi envuelto;
+ * apagado -> inválido */
+static void test_ahrs_sin_ruido(void)
+{
+    const Params p = base();
+    FlightSim sim;
+    SensorsSim ss;
+    const double r2d = 180.0 / SENSORS_SIM_PI;
+
+    init(&sim, &ss, &p, false);
+    SensorsSim_Update(&ss, &sim, 0.001);
+    EXPECT_FALSE(SensorsSim_GetDataPtr(&ss)->ahrs.valid);
+
+    ss.cfg.ahrs_enabled = true;
+    ss.cfg.noise.ahrs_phi_bias_deg = 1.0;
+    sim.X_lat[3] = 0.2;     // dphi
+    sim.X_lat[4] = 0.3;     // dpsi
+    sim.X_lon[3] = 0.1;     // dtheta
+    SensorsSim_Update(&ss, &sim, 0.001);
+
+    const SensorAhrsData *a = &SensorsSim_GetDataPtr(&ss)->ahrs;
+    EXPECT_TRUE(a->valid);
+    EXPECT_TRUE(cerca(a->phi_deg, 0.2 * r2d + 1.0, 1e-9));
+    EXPECT_TRUE(cerca(a->theta_deg, 0.1 * r2d + (double)p.theta0_deg, 1e-5));
+    EXPECT_TRUE(cerca(a->psi_deg, 0.3 * r2d, 1e-9));
+
+    /* Envoltura a [-180, 180): 190 -> -170, 180 -> -180, -180 -> -180 */
+    sim.X_lat[4] = 190.0 / r2d;
+    SensorsSim_Update(&ss, &sim, 0.001);
+    EXPECT_TRUE(cerca(a->psi_deg, -170.0, 1e-9));
+    sim.X_lat[4] = 180.0 / r2d;
+    SensorsSim_Update(&ss, &sim, 0.001);
+    EXPECT_TRUE(cerca(a->psi_deg, -180.0, 1e-9));
+    sim.X_lat[4] = -180.0 / r2d;
+    SensorsSim_Update(&ss, &sim, 0.001);
+    EXPECT_TRUE(cerca(a->psi_deg, -180.0, 1e-9));
+}
+
+/* T12: AHRS con ruido -> sigma configurada en cada ángulo */
+static void test_ahrs_ruido(void)
+{
+    const Params p = base();
+    FlightSim sim;
+    SensorsSim ss;
+
+    init(&sim, &ss, &p, true);
+    ss.cfg.ahrs_enabled = true;
+    ss.cfg.noise.ahrs_att_noise_std_deg = 0.2;
+    ss.cfg.noise.ahrs_psi_noise_std_deg = 0.5;
+
+    double f1 = 0, f2 = 0, t1 = 0, t2 = 0, s1 = 0, s2 = 0;
+    for (int k = 0; k < N_MUESTRAS; ++k) {
+        SensorsSim_Update(&ss, &sim, 0.0);
+        const SensorAhrsData *a = &SensorsSim_GetDataPtr(&ss)->ahrs;
+        f1 += a->phi_deg;    f2 += a->phi_deg * a->phi_deg;
+        t1 += a->theta_deg;  t2 += a->theta_deg * a->theta_deg;
+        s1 += a->psi_deg;    s2 += a->psi_deg * a->psi_deg;
+    }
+    const double n = N_MUESTRAS;
+    EXPECT_TRUE(cerca(sqrt(f2 / n - (f1 / n) * (f1 / n)), 0.2, 0.05 * 0.2));
+    EXPECT_TRUE(cerca(sqrt(t2 / n - (t1 / n) * (t1 / n)), 0.2, 0.05 * 0.2));
+    EXPECT_TRUE(cerca(sqrt(s2 / n - (s1 / n) * (s1 / n)), 0.5, 0.05 * 0.5));
+}
+
+/* T13: encender el AHRS con ruido no cambia ni un bit de los demás sensores */
+static void test_ahrs_aislado(void)
+{
+    const Params p = base();
+    FlightSim sim;
+    SensorsSim con, sin_ahrs;
+
+    init(&sim, &con, &p, true);
+    init(&sim, &sin_ahrs, &p, true);
+    con.cfg.ahrs_enabled = true;
+    con.cfg.noise.ahrs_att_noise_std_deg = 0.2;
+    con.cfg.noise.ahrs_psi_noise_std_deg = 0.5;
+
+    for (int k = 0; k < 1000; ++k) {
+        SensorsSim_Update(&con, &sim, 0.001);
+        SensorsSim_Update(&sin_ahrs, &sim, 0.001);
+        const SensorsSimData *a = SensorsSim_GetDataPtr(&con);
+        const SensorsSimData *b = SensorsSim_GetDataPtr(&sin_ahrs);
+        EXPECT_TRUE(a->pitot.diff_pressure_pa == b->pitot.diff_pressure_pa);
+        EXPECT_TRUE(a->vane.AngleOfAttack_deg == b->vane.AngleOfAttack_deg);
+    }
+}
+
 int main(void)
 {
     test_pitot_sin_ruido();
@@ -341,5 +430,8 @@ int main(void)
     test_imu_retencion();
     test_imu_semilla();
     test_imu_aislada();
+    test_ahrs_sin_ruido();
+    test_ahrs_ruido();
+    test_ahrs_aislado();
     TEST_RETURN();
 }

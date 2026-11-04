@@ -40,6 +40,7 @@ typedef enum
     SENSORS_RNG_IMU,
     SENSORS_RNG_GPS,
     SENSORS_RNG_LASER,
+    SENSORS_RNG_AHRS,    // al final: la semilla de cada sensor depende de su índice
     SENSORS_RNG_N
 } SensorsRng_e;
 
@@ -96,6 +97,13 @@ typedef struct
     double laser_noise_std_m;
     double laser_bias_m;
 
+    /* AHRS ideal: misma sigma para phi y theta, otra para psi; bias por ángulo */
+    double ahrs_att_noise_std_deg;
+    double ahrs_psi_noise_std_deg;
+    double ahrs_phi_bias_deg;
+    double ahrs_theta_bias_deg;
+    double ahrs_psi_bias_deg;
+
 } SensorsSimNoiseConfig;
 
 /* ============================================================
@@ -117,6 +125,7 @@ typedef struct
     bool imu_enabled;
     bool gps_enabled;
     bool laser_enabled;
+    bool ahrs_enabled;
 
     /* Semilla para ruido pseudoaleatorio */
     uint32_t random_seed;
@@ -186,6 +195,17 @@ typedef struct
 
 } SensorLaserAltData;
 
+/* AHRS ideal: actitud verdadera + ruido + bias (sin estimador) */
+typedef struct
+{
+    bool valid;
+
+    double phi_deg;
+    double theta_deg;
+    double psi_deg;            // [-180, 180)
+
+} SensorAhrsData;
+
 typedef struct
 {
     double t_s;
@@ -195,6 +215,7 @@ typedef struct
     SensorImuData      imu;
     SensorGpsData      gps;
     SensorLaserAltData laser;
+    SensorAhrsData     ahrs;
 
 } SensorsSimData;
 

@@ -137,6 +137,7 @@ Secuencia & Sensor & Muestras por paso \\
 \texttt{SENSORS\_RNG\_IMU}   & semilla de la IMU (sec.~\ref{sec:imu}) & --- \\
 \texttt{SENSORS\_RNG\_GPS}   & posición y velocidad GPS           & 6 \\
 \texttt{SENSORS\_RNG\_LASER} & altímetro láser                    & 1 \\
+\texttt{SENSORS\_RNG\_AHRS}  & AHRS ($\phi$, $\theta$, $\psi$)   & 3 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -562,6 +563,32 @@ con casi todas las PSD desplazadas cerca de 20\% a la vez. Es una validación de
 porque los mismos datos ajustaron el modelo.
 
 % ============================================================
+\section{AHRS ideal}
+\label{sec:ahrs}
+% ============================================================
+
+El control lateral necesita $\phi$ y $\psi$, y aún no hay estimador de actitud.
+Mientras tanto, el AHRS entrega la actitud verdadera con el esquema
+aditivo~\eqref{eq:medicion}, sin estimador ni retardo:
+\begin{equation}
+  \phi_m = \phi + b_\phi + \nu_\phi, \qquad
+  \theta_m = \theta + b_\theta + \nu_\theta, \qquad
+  \psi_m = \operatorname{wrap}_{[-180,\,180)}(\psi + b_\psi + \nu_\psi),
+\end{equation}
+con $\nu_\phi, \nu_\theta \sim \Normal(0, \sigma_a^2)$ y
+$\nu_\psi \sim \Normal(0, \sigma_\psi^2)$ independientes, tres muestras
+consecutivas de \texttt{SENSORS\_RNG\_AHRS}. Se actualiza cada paso, como el
+pitot y la veleta.
+
+\paragraph{Elección de $\sigma$.} $\sigma_a = \SI{0.2}{\degree}$ y
+$\sigma_\psi = \SI{0.5}{\degree}$ son valores \textbf{propuestos, sin datos
+medidos}, pendientes de revisar. Los sesgos están en 0.
+
+\paragraph{Limitación.} Un estimador real tendría errores correlacionados en el
+tiempo y retardo, no ruido blanco, así que este modelo es optimista para los
+lazos de actitud y rumbo.
+
+% ============================================================
 \section{Resumen de parámetros}
 % ============================================================
 
@@ -583,6 +610,11 @@ IMU    & \clave{imu\_profile}              & floor & --- \\
        & \clave{imu\_vib\_env}             & 1     & --- \\
        & \clave{imu\_noise\_scale}, \clave{imu\_white\_scale} & 1 & --- \\
        & \clave{imu\_vib\_scale}, \clave{imu\_bias\_scale}    & 1 & --- \\
+\midrule
+AHRS   & \clave{ahrs\_att\_noise\_std\_deg} & 0.2 & \si{\degree} \\
+       & \clave{ahrs\_psi\_noise\_std\_deg} & 0.5 & \si{\degree} \\
+       & \clave{ahrs\_phi\_bias\_deg}, \clave{ahrs\_theta\_bias\_deg} & 0 & \si{\degree} \\
+       & \clave{ahrs\_psi\_bias\_deg}        & 0   & \si{\degree} \\
 \midrule
 \multicolumn{4}{l}{\emph{Otros sensores (mismo modelo \eqref{eq:medicion}, no
 detallados aquí)}} \\
@@ -623,6 +655,9 @@ verdaderas más el sesgo.
     \item T8: retención durante \SI{5}{ms} y muestra nueva en el quinto paso.
     \item T9 y T10: misma semilla, misma salida; encender la IMU no cambia
           ni un bit de $\dpm$.
+    \item T11 a T13: AHRS sin ruido igual a la actitud verdadera más sesgo, con
+          $\psi$ envuelto; $\hat\sigma$ dentro de 5\% de la configurada;
+          encenderlo no cambia ni un bit de $\dpm$ ni de $\alpha$.
   \end{itemize}
 \end{itemize}
 
