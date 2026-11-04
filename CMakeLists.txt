@@ -128,6 +128,24 @@ if(SIL_BUILD_TESTS)
     target_link_libraries(test_gyro_filter PRIVATE m)
     add_test(NAME test_gyro_filter COMMAND test_gyro_filter)
 
+    add_executable(test_yaw_damper_cl
+        test/test_yaw_damper_cl.c
+        src/aircraft_loader.c
+        src/atmosphere.c
+        src/dynamics.c
+        src/flight_management.c
+        src/flight_sim.c
+        src/pilot_sim.c
+        src/servo_sim.c
+    )
+    target_include_directories(test_yaw_damper_cl PRIVATE src test)
+    target_compile_options(test_yaw_damper_cl PRIVATE -Wall)
+    target_link_libraries(test_yaw_damper_cl PRIVATE m)
+    target_compile_definitions(test_yaw_damper_cl PRIVATE
+        UGLY_STICK_JSON="${CMAKE_SOURCE_DIR}/aircraft/ugly_stick.json"
+    )
+    add_test(NAME test_yaw_damper_cl COMMAND test_yaw_damper_cl)
+
     add_executable(test_lateral_matrices
         test/test_lateral_matrices.c
         src/dynamics.c
