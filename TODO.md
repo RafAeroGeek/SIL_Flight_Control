@@ -120,8 +120,8 @@
     perilla la cubre.
   - Sin filtro, el control recibe la vibración completa (`p`: 0.085 rad/s RMS a
     11–18 Hz). El log parece venir ya filtrado por ArduPilot (inferencia por los
-    nombres de columnas), así que no suponer otro LPF igual sin revisarlo. Se
-    decide en F4.
+    nombres de columnas), así que no suponer otro LPF igual sin revisarlo. F4
+    agregó un filtro de 1er orden configurable por eje; el corte queda por ajustar.
 
 ### 4.3 Datos del .bin de ArduPilot
 - **Task:** Del log original, si los tiene, sacar `INS_GYRO_FILTER` e

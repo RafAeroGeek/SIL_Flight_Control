@@ -106,7 +106,8 @@ static void test_lazo_abierto(void)
 }
 
 /* T2: con el yaw damper, a los 2-3 s queda bien por debajo del lazo abierto.
-   Polo dominante de diseño -2.32: e^(-2.32*2) = 0.01 */
+   El dutch roll ya se apagó; lo que resta, cerca del 4 % de R0, es el modo de
+   espiral, que el yaw damper no corrige (el modelo lineal da lo mismo) */
 static void test_lazo_cerrado(void)
 {
     const double abierto = correr(0, 2.0, 3.0);

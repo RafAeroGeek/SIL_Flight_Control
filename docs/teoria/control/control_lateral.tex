@@ -51,6 +51,7 @@ lateral con tres modos, seleccionados con el canal \clave{mode\_switch} del radi
 0 & Manual        & ninguno (stick directo a las superficies) \\
 1 & Estabilizado  & yaw damper + alabeo; el stick de roll comanda $\phi_c$ \\
 2 & Rumbo         & yaw damper + alabeo + rumbo; $\psi_c$ se captura al entrar \\
+3 & Yaw damper    & solo yaw damper, para probarlo; alerón directo del stick \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -405,7 +406,10 @@ Lo que las fases F3--F6 deben respetar para que el C reproduzca este diseño:
   \item \textbf{Modos}: \func{FM\_SetModeSwitch} mapea el switch: 0 a
         \texttt{FM\_MODE\_MANUAL}; 1 a \texttt{FM\_MODE\_ATTITUDE} con
         \texttt{FM\_YAW\_MODE\_RATE}; 2 a \texttt{FM\_MODE\_ATTITUDE} con
-        \texttt{FM\_YAW\_MODE\_HEADING\_HOLD}.
+        \texttt{FM\_YAW\_MODE\_HEADING\_HOLD}; 3 a
+        \texttt{FM\_MODE\_GYRO\_STAB}.
+  \item \textbf{Filtro de giros}: $p$, $q$, $r$ pasan por un filtro de primer
+        orden antes de las leyes (sección~\ref{sec:filtro}).
   \item \textbf{Entradas}: $p$, $r$ del giróscopo (con ruido); $\phi$, $\psi$
         del AHRS ideal. Unidades en grados o radianes indistintamente: las
         ganancias son adimensionales ($K_p$ en segundos).
@@ -429,6 +433,53 @@ Lo que las fases F3--F6 deben respetar para que el C reproduzca este diseño:
   \item \textbf{Cambios de modo}: reiniciar el estado del washout al entrar a
         un modo con yaw damper, para evitar escalones de timón.
 \end{itemize}
+
+% ============================================================
+\section{Filtro de giros}
+\label{sec:filtro}
+% ============================================================
+
+El giro trae vibración, así que antes de las leyes pasa por un filtro con la
+misma forma que la dinámica de los servos:
+\begin{equation}
+  \dot y = \frac{u - y}{\tau}, \qquad \tau = \frac{1}{2\pi f_c},
+\end{equation}
+integrado con \func{rk4\_step\_1st} en \func{Task\_5ms}. El corte se configura
+por eje en \archivo{config/FCS\_gains.json} (\clave{gyro\_roll\_rate\_fc\_hz},
+\clave{gyro\_pitch\_rate\_fc\_hz}, \clave{gyro\_yaw\_rate\_fc\_hz}); con 0 no se
+filtra. Hoy es \SI{20}{Hz} en los tres.
+
+\paragraph{Límite de \SI{40}{Hz}.} Por paso, RK4 multiplica el error por
+$g = 1 + z + z^2/2 + z^3/6 + z^4/24$, con $z = -\Delta t/\tau$. Con
+$\Delta t = \SI{5}{ms}$, $g$ coincide con $e^{z}$ hasta unos \SI{20}{Hz}, se
+separa a \SI{40}{Hz} (0.306 frente a 0.285), a \SI{80}{Hz} ya responde mucho
+más lento (0.66 frente a 0.08) y desde \SI{89}{Hz} diverge. Por eso el corte se
+limita a \SI{40}{Hz}.
+
+\paragraph{Efecto en el diseño.} El diseño de este documento no incluye el
+filtro. Agregándolo en $p$ y $r$ al modelo lineal, el criterio
+$\zeta \ge 0.4$ se sigue cumpliendo en los tres lazos:
+
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+$f_c$ [\si{Hz}] & Yaw damper & Estabilizado & Rumbo \\
+\midrule
+5        & 0.62 & 0.51 & 0.50 \\
+10       & 0.72 & 0.63 & 0.46 \\
+20       & 0.77 & 0.70 & 0.44 \\
+40       & 0.80 & 0.73 & 0.43 \\
+sin filtro & 0.83 & 0.76 & 0.42 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Es la $\zeta$ mínima de los polos complejos en cada lazo. No incluye el
+muestreo a \SI{200}{Hz} ni la vibración, que se revisan en simulación.
+
+\paragraph{Validación.} En la corrida con ruido, la atenuación medida (espectro
+cruzado entre crudo y filtrado, de 8 a \SI{30}{Hz}) difiere menos de 2\,\% de la
+teórica en \SI{5}{Hz}, \SI{20}{Hz} y \SI{40}{Hz}.
 
 % ============================================================
 \section{Resumen y reproducción}

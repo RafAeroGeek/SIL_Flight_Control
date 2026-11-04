@@ -12,6 +12,8 @@ Vectores de estado (ejes cuerpo):
 Aeronave activa: `aircraft/ugly_stick.json` (ver `AIRCRAFT_JSON_PATH`).
 Ganancias del FCS: `config/FCS_gains.json` (ver `FCS_GAINS_JSON_PATH`); para agregar
 una, se añade su campo a `FM_Config` y una fila a `kFcsFields` en `aircraft_loader.c`.
+El mismo archivo fija el corte del filtro de giros por eje (`gyro_roll_rate_fc_hz`,
+`gyro_pitch_rate_fc_hz`, `gyro_yaw_rate_fc_hz`): 0 no filtra y el máximo es 40 Hz.
 
 Las derivadas **longitudinales y laterales** de `ugly_stick.json` salen de
 `dynamics/` (estimación con Nelson a H = 1000 m, V0 = 25.25 m/s, m = 20 kg,
@@ -283,16 +285,23 @@ En `src/sim_settings.h`:
   satura el alerón a 20° y queda solo para la regresión longitudinal.
 
 El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad, dpsi_rad`,
-`ahrs_phi_deg, ahrs_theta_deg, ahrs_psi_deg` (AHRS ideal) y `yaw_mode`. La columna
-`mode` registra el modo activo (`FM_Mode`), no la posición del switch.
+`ahrs_phi_deg, ahrs_theta_deg, ahrs_psi_deg` (AHRS ideal), `yaw_mode`,
+`gyro_{x,y,z}_radps_filtered` y `gyro_{x,y,z}_fc_hz` (filtro de giros) y
+`yd_r_wo_dps, yd_dr_deg` (yaw damper). La columna `mode` registra el modo activo
+(`FM_Mode`), no la posición del switch.
+
+Para ver el yaw damper, `ROUTINE_YAW_DAMPER` repite el mismo doblete de timón en
+MANUAL y en `FM_MODE_GYRO_STAB` (`mode_switch` 3):
+`cmake -S . -B build -DCMAKE_C_FLAGS=-DSIM_PILOT_ROUTINE=ROUTINE_YAW_DAMPER`.
+El efecto del filtro se ve en flightreview, en *Sensores e Inercial / Filtro giros*.
 
 ## Pendientes conocidos
 
 - `flight_management.c` solo implementa el modo MANUAL: `Task_5ms` pasa los
-  sticks por `FM_Update_5ms` y la salida es copia exacta de la entrada. `FM_State` ya
-  se llena desde los sensores y las ganancias se cargan al iniciar, pero nadie las
-  usa todavía: los modos con lazos (yaw damper, estabilizado, rumbo) y los tres
-  tiers de control llegan en el Paso 4. Por eso `mode_switch` 1 y 2 se ignoran.
+  sticks por `FM_Update_5ms` y la salida es copia exacta de la entrada. El yaw
+  damper funciona en `FM_MODE_GYRO_STAB` (`mode_switch` 3), con los giros filtrados.
+  Estabilizado, rumbo y los tres tiers de control llegan en el Paso 4; por eso
+  `mode_switch` 1 y 2 se ignoran y la espiral sigue inestable.
   El AHRS es ideal (actitud verdadera más ruido, sigmas propuestos sin medir). Las tareas de 30, 150 y 500 ms en `main.c`
   tampoco hacen nada todavía.
 - El throttle no realimenta la planta, y su `tau`/`rate_limit` de ESC en
