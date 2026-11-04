@@ -139,6 +139,9 @@ typedef struct
     // Lazos laterales
     FM_LateralGains lat;
 
+    // Stick de yaw -> timón [deg por unidad de stick], signo incluido (Nelson)
+    float rudder_deg_per_stick;
+
     // Corte del filtro de giros [Hz], ejes x, y, z; 0 = sin filtro
     float gyro_fc_hz[3];
 

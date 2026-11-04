@@ -94,6 +94,11 @@ SimRc_s rc_source(pilotcommand_s pilot) {
 }
 
 
+float rc_yaw_deg_per_stick(float rudder_k_deg_per_us)
+{
+    return rudder_k_deg_per_us * RC_STICK_TO_US * RC_YAW_TO_RUDDER_SIGN;
+}
+
 void rc_to_servo_cmds_us(const SimRc_s *rc,
                          const float trim_us[SERVO_SIM_N_SERVOS],
                          float cmd_us[SERVO_SIM_N_SERVOS])

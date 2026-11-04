@@ -211,11 +211,18 @@ static void test_signo_planta(void)
     EXPECT_TRUE(sim.X_lat[2] > 0.0);   // dr
 }
 
+/* T5: stick de yaw -> timón, de punta a punta: 0.18 deg/us * 500 us * (-1) */
+static void test_yaw_deg_por_stick(void)
+{
+    EXPECT_FLOAT_EQ(rc_yaw_deg_per_stick(0.18f), -90.0f);
+}
+
 int main(void)
 {
     test_ruteo();
     test_escalon();
     test_saturacion_y_rate();
     test_signo_planta();
+    test_yaw_deg_por_stick();
     TEST_RETURN();
 }

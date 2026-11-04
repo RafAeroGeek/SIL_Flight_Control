@@ -159,15 +159,6 @@ void task_init_1ms(void)
 
     FlightSim_Actuators_init(&g_act, &g_params);
 
-    /* Flight management: arranca en MANUAL (paso directo de los sticks).
-       Si falla la carga, las ganancias quedan en 0 y ya se avisó por stderr. */
-    FM_Config fm_cfg = {0};
-    fm_cfg.thr_min = 0.0f;
-    fm_cfg.thr_max = 1.0f;
-    (void)Aircraft_LoadFcsGains(FCS_GAINS_JSON_PATH, &fm_cfg);
-    FM_Init(&fm_cfg, FM_MODE_MANUAL);
-    GyroFilter_Init(&g_gyro_filter, fm_cfg.gyro_fc_hz);
-
     /* 3) Servos: base = tabla compilada; overrides opcionales del JSON de la
        aeronave (dt_s se mantiene en el default: es del arnes SIL, no del
        airframe). Si el JSON no trae claves servo_*, quedan los defaults. */
@@ -178,6 +169,16 @@ void task_init_1ms(void)
     aplicar_trim_servo(servo_cfg, SERVO_AILERON,  g_params.delta_a_trim_deg);
     aplicar_trim_servo(servo_cfg, SERVO_RUDDER,   g_params.delta_r_trim_deg);
     Servos_Init_All_Cfg(servo_cfg);
+
+    /* Flight management: arranca en MANUAL (paso directo de los sticks).
+       Si falla la carga, las ganancias quedan en 0 y ya se avisó por stderr. */
+    FM_Config fm_cfg = {0};
+    fm_cfg.thr_min = 0.0f;
+    fm_cfg.thr_max = 1.0f;
+    (void)Aircraft_LoadFcsGains(FCS_GAINS_JSON_PATH, &fm_cfg);
+    fm_cfg.rudder_deg_per_stick = rc_yaw_deg_per_stick(servo_cfg[SERVO_RUDDER].k_deg_per_us);
+    FM_Init(&fm_cfg, FM_MODE_MANUAL);
+    GyroFilter_Init(&g_gyro_filter, fm_cfg.gyro_fc_hz);
 
     /* Comando inicial = trim (sticks al centro). Sin esto el servo recibe 0 us
        hasta la primera corrida de Task_5ms (t = 5 ms) y se aleja del trim. */

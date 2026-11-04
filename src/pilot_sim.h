@@ -62,5 +62,9 @@ void rc_to_servo_cmds_us(const SimRc_s *rc,
                          const float trim_us[SERVO_SIM_N_SERVOS],
                          float cmd_us[SERVO_SIM_N_SERVOS]);
 
+/* Deflexión del timón por unidad de stick de yaw [deg], con el mismo ruteo de
+   rc_to_servo_cmds_us. Convierte a stick las leyes que calculan delta_r. */
+float rc_yaw_deg_per_stick(float rudder_k_deg_per_us);
+
 
 #endif // PILOT_SIM_H_INCLUDED
