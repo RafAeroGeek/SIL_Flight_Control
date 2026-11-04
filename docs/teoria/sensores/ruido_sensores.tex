@@ -372,6 +372,40 @@ El ruido en velocidad es inversamente proporcional a $V$: a \SI{5}{m/s} ya es
 de \SI{1}{m/s}. Es el comportamiento que se observa en vuelo real y el motivo
 para modelar el ruido en la presión.
 
+\subsection{Filtro de la velocidad indicada}
+
+El software de vuelo no usa la IAS cruda: en \func{Task\_5ms} pasa por un filtro
+de primer orden \texttt{Lpf1} (\archivo{src/lpf1.c}), el mismo de los giros, con
+corte \clave{pitot\_fc\_hz} en \archivo{config/FCS\_gains.json}, hoy \SI{5}{Hz}
+($\tau = \SI{32}{ms}$).
+
+Con ruido blanco muestreado cada $\Delta t = \SI{5}{ms}$, un filtro
+$y_k = g\,y_{k-1} + (1-g)\,u_k$ reduce la desviación a
+\begin{equation}
+  \sigma_y = \sigma_u \sqrt{\frac{1-g}{1+g}}.
+\end{equation}
+Corre a \SI{5}{ms} aunque el lazo que la use sea más lento: una tarea de
+\SI{30}{ms} que leyera la señal cruda heredaría toda la $\sigma$, porque el ruido
+no se reduce por tomar menos muestras. Dentro de un tick, \func{Task\_5ms} corre
+antes que \func{Task\_30ms}, que lee el valor de su mismo tick.
+
+En una corrida de \SI{10}{s} sin maniobras:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Señal & $\hat\sigma$ cada \SI{1}{ms} [\si{m/s}] & $\hat\sigma$ leída cada \SI{30}{ms} [\si{m/s}] \\
+\midrule
+IAS cruda    & 0.191 & 0.185 \\
+IAS filtrada & 0.055 & 0.055 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La teoría da \SI{0.053}{m/s}. Lecturas consecutivas a \SI{30}{ms} siguen algo
+correlacionadas (0.43 medido, $g^6 \approx 0.39$), así que el ruido residual no
+es blanco para el lazo lento.
+
 \subsection{Salidas y columnas del CSV}
 
 \begin{center}
@@ -389,7 +423,9 @@ Campo en \texttt{SensorPitotData} & Columna CSV & Unidad & Ecuación \\
 \textbf{Ojo:} la columna \clave{pitot\_ms} ahora es la IAS (lo que de verdad
 entrega el sensor), $\approx 5\%$ menor que la TAS a \SI{1000}{m}. Para
 comparar con el estado del avión hay que usar \clave{tas\_ms}; flightreview
-ya lo hace en el derrape estimado.
+ya lo hace en el derrape estimado. La IAS filtrada se registra en
+\clave{pitot\_ms\_filtered} y su corte en \clave{pitot\_fc\_hz}; de t = 1 a
+\SI{4}{ms}, antes de la primera corrida del filtro, la columna repite la medición.
 
 % ============================================================
 \section{Veleta de ángulo de ataque y derrape}

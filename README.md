@@ -13,7 +13,8 @@ Aeronave activa: `aircraft/ugly_stick.json` (ver `AIRCRAFT_JSON_PATH`).
 Ganancias del FCS: `config/FCS_gains.json` (ver `FCS_GAINS_JSON_PATH`); para agregar
 una, se añade su campo a `FM_Config` y una fila a `kFcsFields` en `aircraft_loader.c`.
 El mismo archivo fija el corte del filtro de giros por eje (`gyro_roll_rate_fc_hz`,
-`gyro_pitch_rate_fc_hz`, `gyro_yaw_rate_fc_hz`): 0 no filtra y el máximo es 40 Hz.
+`gyro_pitch_rate_fc_hz`, `gyro_yaw_rate_fc_hz`) y el de la IAS del pitot
+(`pitot_fc_hz`): 0 no filtra y el máximo es 40 Hz.
 
 Las derivadas **longitudinales y laterales** de `ugly_stick.json` salen de
 `dynamics/` (estimación con Nelson a H = 1000 m, V0 = 25.25 m/s, m = 20 kg,
@@ -287,7 +288,8 @@ En `src/sim_settings.h`:
 El CSV agrega al final las columnas `dv_mps, dp_radps, dr_radps, dphi_rad, dpsi_rad`,
 `ahrs_phi_deg, ahrs_theta_deg, ahrs_psi_deg` (AHRS ideal), `yaw_mode`,
 `gyro_{x,y,z}_radps_filtered` y `gyro_{x,y,z}_fc_hz` (filtro de giros) y
-`yd_r_wo_dps, yd_dr_deg` (yaw damper). La columna `mode` registra el modo activo
+`yd_r_wo_dps, yd_dr_deg` (yaw damper) y `pitot_ms_filtered, pitot_fc_hz` (IAS
+filtrada). La columna `mode` registra el modo activo
 (`FM_Mode`), no la posición del switch.
 
 Para ver el yaw damper, `ROUTINE_YAW_DAMPER` repite el mismo doblete de timón en
