@@ -228,7 +228,9 @@ void task_init_1ms(void)
                         "laser_alt_m,"                                      // Laser
                         "dv_mps,dp_radps,dr_radps,dphi_rad,dpsi_rad,"       // Estado lateral-direccional
                         "ahrs_phi_deg,ahrs_theta_deg,ahrs_psi_deg,"         // AHRS ideal
-                        "yaw_mode\n" );                                     // FM_YawMode
+                        "yaw_mode,"                                         // FM_YawMode
+                        "gyro_x_radps_filtered,gyro_y_radps_filtered,gyro_z_radps_filtered,"
+                        "gyro_x_fc_hz,gyro_y_fc_hz,gyro_z_fc_hz\n" );       // filtro de giros
 
             fflush(g_fp);
             printf("CSV abierto: %s\n", csv_path);
@@ -384,7 +386,9 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.6f,"                 // Laser
                     "%.6f,%.6f,%.6f,%.6f,%.6f,"  // dv, dp, dr, dphi, dpsi
                     "%.6f,%.6f,%.6f,"            // AHRS phi, theta, psi [deg]
-                    "%d\n",                      // yaw_mode
+                    "%d,"                        // yaw_mode
+                    "%.6f,%.6f,%.6f,"            // giros filtrados [rad/s]
+                    "%.3f,%.3f,%.3f\n",          // corte aplicado [Hz]
                     (double)t_s,                                            // 1. tiempo
                     (double)u_elev, (double)u_ail,                          // comandos us
                     (double)u_rud,  (double)u_thro,
@@ -431,7 +435,11 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     g_sens_data.ahrs.phi_deg, g_sens_data.ahrs.theta_deg,   // AHRS
                     g_sens_data.ahrs.psi_deg,
 
-                    (int)fm_status.yaw_mode );
+                    (int)fm_status.yaw_mode,
+
+                    g_gyro_filt_radps[0], g_gyro_filt_radps[1], g_gyro_filt_radps[2],
+                    (double)g_gyro_filter.fc_hz[0], (double)g_gyro_filter.fc_hz[1],
+                    (double)g_gyro_filter.fc_hz[2] );
 
             /* Flush cada 100 ms */
             if ((now_ms % 100u) == 0u) {
