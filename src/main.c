@@ -387,8 +387,8 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
                     "%.6f,"                 // Laser
                     "%.6f,%.6f,%.6f,%.6f,%.6f\n", // dv, dp, dr, dphi, dpsi
                     (double)t_s,                                            // 1. tiempo
-                    (double)servo_cmd_us[SERVO_ELEVATOR], (double)servo_cmd_us[SERVO_AILERON],  // comandos us
-                    (double)servo_cmd_us[SERVO_RUDDER], (double)servo_cmd_us[SERVO_THROTTLE],
+                    (double)u_elev, (double)u_ail,                          // comandos us
+                    (double)u_rud,  (double)u_thro,
                     (double)rc_sim.s[RC_CH_PITCH],                          // 6. valores RC
                     (double)rc_sim.s[RC_CH_ROLL],
                     (double)rc_sim.s[RC_CH_YAW],
@@ -440,7 +440,7 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
         {
             printf("t=%.3f | CMD[us]: E=%.1f A=%.1f R=%.1f T=%.1f | OUT[deg]: E=%.2f A=%.2f R=%.2f T=%.2f\n",
                    (double)t_s,
-                   (double)servo_cmd_us[SERVO_ELEVATOR], (double)servo_cmd_us[SERVO_AILERON], (double)servo_cmd_us[SERVO_RUDDER], (double)servo_cmd_us[SERVO_THROTTLE],
+                   (double)u_elev, (double)u_ail, (double)u_rud, (double)u_thro,
                    (double)y_elev, (double)y_ail, (double)y_rud, (double)y_thro);
         }
     #endif
