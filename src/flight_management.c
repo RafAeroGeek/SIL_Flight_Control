@@ -1,4 +1,5 @@
 #include "flight_management.h"
+#include "cl_yaw_damper.h"
 
 #include <math.h>
 #include <string.h>
@@ -14,9 +15,8 @@ static FM_Config    g_cfg;
 static FM_Status    g_status;
 static FM_Actuators g_act_prev FM_UNUSED;
 
-/* Yaw damper: estado del washout y si la ley corrió en el paso anterior */
-static float g_x_wo_dps;
-static bool  g_yd_activo;
+/* Yaw damper: estado de la ley (cl_yaw_damper) */
+static ClYawDamper g_yd;
 
 /* ============================================================
  * Helpers internos
@@ -41,29 +41,23 @@ static bool fm_modo_implementado(FM_Mode mode)
     }
 }
 
-/* Yaw damper: delta_r = K_r * r_wo, con washout por Euler hacia atrás
-   (docs/teoria/control/control_lateral.tex). Devuelve el stick de yaw: el pedal
-   más la ley. Al activarse, el washout arranca en la r actual para evitar un
-   escalón de timón. Sin estado válido o sin conversión, queda solo el pedal. */
+/* Adaptador del FM para el yaw damper (la ley está en cl_yaw_damper.c).
+   Devuelve el stick de yaw: el pedal más la ley convertida a stick. Sin estado
+   válido o sin conversión, reinicia la ley y queda solo el pedal. */
 static float fm_yaw_damper(float yaw_norm, const FM_State *st, float dt_s)
 {
     const float deg_per_stick = g_cfg.rudder_deg_per_stick;
 
     if (st == NULL || !st->valid || fabsf(deg_per_stick) < 1e-6f) {
-        g_yd_activo = false;
+        ClYawDamper_Reset(&g_yd);
         return yaw_norm;
     }
 
-    if (!g_yd_activo) {
-        g_x_wo_dps  = st->r_dps;
-        g_yd_activo = true;
-    }
+    (void)ClYawDamper_Update(&g_yd, g_cfg.lat.K_r, g_cfg.lat.tau_wo_s,
+                             st->r_dps, dt_s);
 
-    const float tau = g_cfg.lat.tau_wo_s;
-    g_x_wo_dps += dt_s / (tau + dt_s) * (st->r_dps - g_x_wo_dps);
-
-    g_status.yd_r_wo_dps = st->r_dps - g_x_wo_dps;
-    g_status.yd_dr_deg   = g_cfg.lat.K_r * g_status.yd_r_wo_dps;
+    g_status.yd_r_wo_dps = g_yd.r_wo_dps;
+    g_status.yd_dr_deg   = g_yd.dr_deg;
 
     return yaw_norm + g_status.yd_dr_deg / deg_per_stick;
 }
@@ -79,8 +73,7 @@ void FM_Init(const FM_Config *cfg, FM_Mode initial_mode)
     memset(&g_status, 0, sizeof(g_status));
     g_status.mode     = FM_MODE_MANUAL;
     g_status.yaw_mode = g_cfg.yaw_mode;
-    g_x_wo_dps  = 0.0f;
-    g_yd_activo = false;
+    ClYawDamper_Reset(&g_yd);
     FM_SetMode(initial_mode);
 }
 
@@ -142,7 +135,7 @@ void FM_Update_5ms(const FM_CommandsNorm *rc_cmd,
         case FM_MODE_MANUAL:
         default:
             /* Paso directo: el piloto manda las superficies */
-            g_yd_activo = false;
+            ClYawDamper_Reset(&g_yd);
             g_status.cmd_out = *rc_cmd;
             break;
     }
