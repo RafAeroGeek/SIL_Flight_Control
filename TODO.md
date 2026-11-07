@@ -280,4 +280,42 @@
 
 ---
 
+## SECTION 9: Pendientes del refactor de tareas de vuelo
+
+Fuera de alcance de `docs/PLAN_FLIGHT_TASKS.md` (refactor puro, CSV idéntico).
+
+### 9.1 Desfase de 1 ms del estado en el CSV
+- **Task:** En `Task_1ms` el estado (`du`…`dtheta`, `X_lat`) se lee **antes**
+  de `FlightSim_Step` y los sensores **después**: en la misma fila del CSV el
+  estado corresponde a t − 1 ms y los sensores a t (ver la NOTA en
+  `arnes_servos_planta`). Corregirlo cambia las columnas de estado y obliga a
+  sacar una línea base nueva: va en un commit aparte.
+- **Priority:** MEDIUM
+
+### 9.2 `rc_mixer` portable al STM32
+- **Task:** Renombrar `SimRc_s` → `RcInput_s` y desacoplar `rc_mixer` de
+  `servo_sim.h` y de `sim_settings.h`.
+- **Priority:** LOW
+
+### 9.3 `FM_Update_5ms` static
+- **Task:** Volver `FM_Update_5ms` `static` y migrar `test_yaw_damper_cl` a
+  `Flight_Task_5ms`.
+- **Priority:** LOW
+
+### 9.4 F5: wing leveler
+- **Task:** `cl_wing_leveler` en `Flight_Task_30ms`, activar `fm_slew_limit`
+  y aceptar `mode_switch` 1.
+- **Priority:** HIGH (siguiente fase)
+
+### 9.5 F6: heading hold
+- **Task:** `cl_heading_hold` en `Flight_Task_150ms`; bloquear el modo 2 si el
+  yaw damper no está activo.
+
+### 9.6 Rutinas de piloto como tabla de eventos
+- **Task:** Reemplazar el `switch` con `step_cmd` de `pilot_source_commands`
+  por una tabla de eventos.
+- **Priority:** LOW
+
+---
+
 ## DEPENDENCIES & SEQUENCING
