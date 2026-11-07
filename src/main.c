@@ -8,8 +8,6 @@
 #include "dynamics.h"
 #include "flight_sim.h"
 #include "flight_management.h"
-#include "gyro_filter.h"
-#include "lpf1.h"
 #include "sim_PWM_processing.h"
 #include "sim_task_management.h"
 #include "servo_sim.h"
@@ -33,16 +31,6 @@ static SensorsSimData g_sens_data;
 
 /* Canales RC del piloto: los escribe Task_1ms y los lee Task_5ms. */
 static SimRc_s g_rc_sim;
-
-/* Filtro de giros (software de vuelo): corre en Task_5ms. */
-static GyroFilter g_gyro_filter;
-static double g_gyro_filt_radps[GYRO_FILTER_N_EJES];
-
-/* Filtro de la IAS del pitot: corre en Task_5ms para que las tareas lentas lean
-   una señal ya filtrada y no el ruido crudo submuestreado. Dentro de un tick,
-   Task_5ms corre antes que Task_30ms: Task_30ms lee el valor de su mismo tick. */
-static Lpf1 g_pitot_filter;
-static double g_pitot_filt_ms;
 
 /* Trim del transmisor [us], uno por servo: el comando del piloto se suma a
    este offset para que con el stick al centro la superficie quede en su
@@ -184,9 +172,10 @@ void task_init_1ms(void)
     fm_cfg.thr_max = 1.0f;
     (void)Aircraft_LoadFcsGains(FCS_GAINS_JSON_PATH, &fm_cfg);
     fm_cfg.rudder_deg_per_stick = rc_yaw_deg_per_stick(servo_cfg[SERVO_RUDDER].k_deg_per_us);
+    for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
+        fm_cfg.trim_us[i] = g_trim_us[i];
+    }
     FM_Init(&fm_cfg, FM_MODE_MANUAL);
-    GyroFilter_Init(&g_gyro_filter, fm_cfg.gyro_fc_hz);
-    Lpf1_Init(&g_pitot_filter, fm_cfg.pitot_fc_hz);
 
     /* Comando inicial = trim (sticks al centro). Sin esto el servo recibe 0 us
        hasta la primera corrida de Task_5ms (t = 5 ms) y se aleja del trim. */
@@ -206,9 +195,11 @@ void task_init_1ms(void)
         printf("Ganancias FCS: K_r=%.3f tau_wo=%.3f K_p=%.3f K_phi=%.3f K_psi=%.3f phi_max=%.1f deg\n",
                fm_cfg.lat.K_r, fm_cfg.lat.tau_wo_s, fm_cfg.lat.K_p,
                fm_cfg.lat.K_phi, fm_cfg.lat.K_psi, fm_cfg.max_bank_deg);
+        FM_Status fm_init_status;
+        FM_GetStatus(&fm_init_status);
         printf("Filtro de giros: fc = %.1f, %.1f, %.1f Hz\n",
-               g_gyro_filter.eje[0].fc_hz, g_gyro_filter.eje[1].fc_hz, g_gyro_filter.eje[2].fc_hz);
-        printf("Filtro de pitot: fc = %.1f Hz\n", g_pitot_filter.fc_hz);
+               fm_init_status.gyro_fc_hz[0], fm_init_status.gyro_fc_hz[1], fm_init_status.gyro_fc_hz[2]);
+        printf("Filtro de pitot: fc = %.1f Hz\n", fm_init_status.pitot_fc_hz);
 
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
@@ -451,16 +442,18 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 
                     (int)fm_status.yaw_mode,
 
-                    g_gyro_filt_radps[0], g_gyro_filt_radps[1], g_gyro_filt_radps[2],
-                    (double)g_gyro_filter.eje[0].fc_hz, (double)g_gyro_filter.eje[1].fc_hz,
-                    (double)g_gyro_filter.eje[2].fc_hz,
+                    fm_status.gyro_filt_radps[0], fm_status.gyro_filt_radps[1],
+                    fm_status.gyro_filt_radps[2],
+                    (double)fm_status.gyro_fc_hz[0], (double)fm_status.gyro_fc_hz[1],
+                    (double)fm_status.gyro_fc_hz[2],
 
                     (double)fm_status.yd_r_wo_dps, (double)fm_status.yd_dr_deg,
 
                     /* Antes de la primera corrida del filtro (t = 5 ms) se registra
                        la medición: un 0 se vería como un salto de 24 m/s en el log */
-                    g_pitot_filter.con_muestra ? g_pitot_filt_ms : (double)g_sens_data.pitot.ias_ms,
-                    (double)g_pitot_filter.fc_hz );
+                    fm_status.pitot_con_muestra ? fm_status.pitot_filt_ms
+                                                : (double)g_sens_data.pitot.ias_ms,
+                    (double)fm_status.pitot_fc_hz );
 
             /* Flush cada 100 ms */
             if ((now_ms % 100u) == 0u) {
@@ -479,80 +472,35 @@ static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
     #endif
 }
 
-/* Estado para el FM desde los sensores (FM_State va en grados y deg/s).
-   La IMU muestrea en t = 1, 6, 11 ms y Task_5ms corre en t = 5, 10, 15 ms: los
-   giros llegan con 4 ms de antigüedad, despreciable frente a los 160 ms de
-   retardo que tolera el diseño (control_lateral.tex). */
-static FM_State fm_state_desde_sensores(const SensorsSimData *d,
-                                        const double gyro_radps[GYRO_FILTER_N_EJES])
+/* Arnés: traduce los datos del simulador a las entradas de sensores del
+   software de vuelo. Copia los campos sin convertir tipos. */
+static FC_SensorsIn fc_sensores_desde_sim(const SensorsSimData *d)
 {
-    const double rad2deg = 180.0 / SENSORS_SIM_PI;
-    const FM_State st = {
-        .phi_deg   = (float)d->ahrs.phi_deg,
-        .theta_deg = (float)d->ahrs.theta_deg,
-        .psi_deg   = (float)d->ahrs.psi_deg,
-        .p_dps     = (float)(gyro_radps[0] * rad2deg),
-        .q_dps     = (float)(gyro_radps[1] * rad2deg),
-        .r_dps     = (float)(gyro_radps[2] * rad2deg),
-        .alt_m     = (float)d->gps.alt_m,
-        .vz_ms     = (float)(-d->gps.vd_ms),
-        .arsp_ms   = (float)g_pitot_filt_ms,
-        .valid     = d->imu.valid && d->ahrs.valid,
+    const FC_SensorsIn sens = {
+        .gyro_radps     = { d->imu.gyro_radps.x, d->imu.gyro_radps.y, d->imu.gyro_radps.z },
+        .imu_valid      = d->imu.valid,
+        .ahrs_phi_deg   = d->ahrs.phi_deg,
+        .ahrs_theta_deg = d->ahrs.theta_deg,
+        .ahrs_psi_deg   = d->ahrs.psi_deg,
+        .ahrs_valid     = d->ahrs.valid,
+        .pitot_ias_ms   = d->pitot.ias_ms,
+        .pitot_valid    = d->pitot.valid,
+        .gps_alt_m      = d->gps.alt_m,
+        .gps_vd_ms      = d->gps.vd_ms,
     };
-    return st;
+    return sens;
 }
 
+/* Adaptador del software de vuelo: entradas desde el simulador ->
+   Flight_Task_5ms -> servos. Toma los canales RC que Task_1ms ya actualizó en
+   este tick; el servo retiene el comando 5 ms y lo ve a partir del siguiente
+   tick. */
 static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
 {
-    (void)now_ms;
-    const float dt_s = (float)dt_ms * 0.001f;
-
-    /* Software de vuelo (lo que correria en el embebido). Toma los canales RC
-       que Task_1ms ya actualizo en este tick; el servo retiene el comando 5 ms
-       y lo ve a partir del siguiente tick. */
-    float flaps_cmd    = g_rc_sim.s[RC_CH_FLAPS];
-    int mode_cmd       = (int)g_rc_sim.s[RC_CH_MODE];
-    bool arm_cmd       = (g_rc_sim.s[RC_CH_ARM] > 0.5f);
-    (void)flaps_cmd;  // sin superficie de flaps en la planta
-
-    /* Flight management: sticks -> comandos de superficie. En MANUAL pasan
-       sin cambios; el modo pedido se ignora si aún no está implementado. */
-    FM_SetArmed(arm_cmd);
-    FM_SetModeSwitch(mode_cmd);
-    const FM_CommandsNorm fm_in = {
-        .roll_norm  = g_rc_sim.s[RC_CH_ROLL],
-        .pitch_norm = g_rc_sim.s[RC_CH_PITCH],
-        .yaw_norm   = g_rc_sim.s[RC_CH_YAW],
-        .throttle   = g_rc_sim.s[RC_CH_THROTTLE],
-    };
-    const double gyro_radps[GYRO_FILTER_N_EJES] = {
-        g_sens_data.imu.gyro_radps.x,
-        g_sens_data.imu.gyro_radps.y,
-        g_sens_data.imu.gyro_radps.z,
-    };
-    GyroFilter_Update(&g_gyro_filter, gyro_radps, (double)dt_s, g_gyro_filt_radps);
-
-    /* Sin medición válida se retiene el último valor */
-    if (g_sens_data.pitot.valid) {
-        g_pitot_filt_ms = Lpf1_Update(&g_pitot_filter, g_sens_data.pitot.ias_ms, (double)dt_s);
-    }
-
-    const FM_State fm_st = fm_state_desde_sensores(&g_sens_data, g_gyro_filt_radps);
-    FM_Update_5ms(&fm_in, &fm_st, dt_s);
-
-    FM_CommandsNorm fm_out;
-    FM_GetCmdOut(&fm_out);
-    SimRc_s rc_fm = g_rc_sim;
-    rc_fm.s[RC_CH_ROLL]     = fm_out.roll_norm;
-    rc_fm.s[RC_CH_PITCH]    = fm_out.pitch_norm;
-    rc_fm.s[RC_CH_YAW]      = fm_out.yaw_norm;
-    rc_fm.s[RC_CH_THROTTLE] = fm_out.throttle;
-
-    /* Canales -> delta PWM [us] por servo, con trim del transmisor */
+    const FC_SensorsIn sens = fc_sensores_desde_sim(&g_sens_data);
     float servo_cmd_us[SERVO_SIM_N_SERVOS];
-    rc_to_servo_cmds_us(&rc_fm, g_trim_us, servo_cmd_us);
-
-    /* Enviar comandos a los servos/actuadores */
+    Flight_Task_5ms(now_ms, dt_ms, &g_rc_sim, (int)g_rc_sim.s[RC_CH_MODE],
+                    &sens, servo_cmd_us);
     for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
         Servos_SetCmdDeltaUs(i, servo_cmd_us[i]);
     }

@@ -140,6 +140,8 @@ if(SIL_BUILD_TESTS)
         src/cl_yaw_damper.c
         src/flight_management.c
         src/flight_sim.c
+        src/gyro_filter.c
+        src/lpf1.c
         src/pilot_sim.c
         src/rc_mixer.c
         src/servo_sim.c
@@ -223,7 +225,11 @@ if(SIL_BUILD_TESTS)
     add_executable(test_flight_management
         test/test_flight_management.c
         src/cl_yaw_damper.c
+        src/dynamics.c
         src/flight_management.c
+        src/gyro_filter.c
+        src/lpf1.c
+        src/rc_mixer.c
     )
     target_include_directories(test_flight_management PRIVATE src test)
     target_compile_options(test_flight_management PRIVATE -Wall)

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "rc_mixer.h"          // SimRc_s, SERVO_SIM_N_SERVOS
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,6 +67,24 @@ typedef struct
 
     bool  valid;
 } FM_State;
+
+/* =========================
+ * Entradas de sensores
+ * =========================
+ * Entradas de sensores del software de vuelo. En el SIL las llena main.c desde
+ * SensorsSimData; en el STM32, los drivers. Mismos tipos que SensorsSimData
+ * para conservar la regresión bit a bit. */
+typedef struct
+{
+    double gyro_radps[3];   // x, y, z
+    bool   imu_valid;
+    double ahrs_phi_deg, ahrs_theta_deg, ahrs_psi_deg;
+    bool   ahrs_valid;
+    double pitot_ias_ms;
+    bool   pitot_valid;
+    double gps_alt_m;
+    double gps_vd_ms;
+} FC_SensorsIn;
 
 /* =========================
  * Actuadores (salida final)
@@ -148,6 +168,10 @@ typedef struct
     // Corte del filtro de la velocidad del pitot [Hz]; 0 = sin filtro
     float pitot_fc_hz;
 
+    // Trim del transmisor [us] por servo (índice ServoChannel_e); lo suma la
+    // mezcla a us de Flight_Task_5ms
+    float trim_us[SERVO_SIM_N_SERVOS];
+
     // Failsafe
     float failsafe_thr;     // [0,1]
 } FM_Config;
@@ -175,16 +199,29 @@ typedef struct
     // Yaw damper (en 0 si no está activo)
     float yd_r_wo_dps;      // r lavada
     float yd_dr_deg;        // delta_r de la ley, respecto al trim
+
+    // Filtros de Flight_Task_5ms (telemetría: log y consola)
+    double gyro_filt_radps[3];  // giros filtrados x, y, z
+    float  gyro_fc_hz[3];       // corte aplicado (tras el límite de Lpf1)
+    double pitot_filt_ms;       // IAS filtrada (retiene el último valor sin medición válida)
+    float  pitot_fc_hz;         // corte aplicado
+    bool   pitot_con_muestra;   // false hasta la primera medición válida
 } FM_Status;
+
 /* ============================================================
- * Ejecuciones por cascada
+ * Tareas del software de vuelo
  * ============================================================ */
 
- void Flight_Control_Attitude_Tier(void);
-
- void Flight_Control_Cruice_Tier(void);
-
- void Flight_Control_Mission_Tier(void);
+/* Tarea de 5 ms: modo y armado -> filtros (giros, pitot) -> FM_State ->
+   leyes según el modo (FM_Update_5ms) -> mezcla a us con trim.
+   mode_cmd es el switch de modo pedido (ver FM_SetModeSwitch); manda sobre
+   rc_sim->s[RC_CH_MODE]. El armado sale de rc_sim->s[RC_CH_ARM] > 0.5.
+   servo_cmd_us: delta PWM [us] por servo (índice ServoChannel_e), trim incluido.
+   Con algún puntero NULL no hace nada (servo_cmd_us no se escribe). */
+void Flight_Task_5ms(uint32_t now_ms, uint32_t dt_ms,
+                     const SimRc_s *rc_sim, int mode_cmd,
+                     const FC_SensorsIn *sens,
+                     float servo_cmd_us[SERVO_SIM_N_SERVOS]);
 
 
 /* =========================
