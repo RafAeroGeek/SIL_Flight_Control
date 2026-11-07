@@ -8,8 +8,6 @@
 #include "dynamics.h"
 #include "flight_sim.h"
 #include "flight_management.h"
-#include "gyro_filter.h"
-#include "lpf1.h"
 #include "sim_PWM_processing.h"
 #include "sim_task_management.h"
 #include "servo_sim.h"
@@ -33,16 +31,6 @@ static SensorsSimData g_sens_data;
 
 /* Canales RC del piloto: los escribe Task_1ms y los lee Task_5ms. */
 static SimRc_s g_rc_sim;
-
-/* Filtro de giros (software de vuelo): corre en Task_5ms. */
-static GyroFilter g_gyro_filter;
-static double g_gyro_filt_radps[GYRO_FILTER_N_EJES];
-
-/* Filtro de la IAS del pitot: corre en Task_5ms para que las tareas lentas lean
-   una señal ya filtrada y no el ruido crudo submuestreado. Dentro de un tick,
-   Task_5ms corre antes que Task_30ms: Task_30ms lee el valor de su mismo tick. */
-static Lpf1 g_pitot_filter;
-static double g_pitot_filt_ms;
 
 /* Trim del transmisor [us], uno por servo: el comando del piloto se suma a
    este offset para que con el stick al centro la superficie quede en su
@@ -184,9 +172,10 @@ void task_init_1ms(void)
     fm_cfg.thr_max = 1.0f;
     (void)Aircraft_LoadFcsGains(FCS_GAINS_JSON_PATH, &fm_cfg);
     fm_cfg.rudder_deg_per_stick = rc_yaw_deg_per_stick(servo_cfg[SERVO_RUDDER].k_deg_per_us);
+    for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
+        fm_cfg.trim_us[i] = g_trim_us[i];
+    }
     FM_Init(&fm_cfg, FM_MODE_MANUAL);
-    GyroFilter_Init(&g_gyro_filter, fm_cfg.gyro_fc_hz);
-    Lpf1_Init(&g_pitot_filter, fm_cfg.pitot_fc_hz);
 
     /* Comando inicial = trim (sticks al centro). Sin esto el servo recibe 0 us
        hasta la primera corrida de Task_5ms (t = 5 ms) y se aleja del trim. */
@@ -206,9 +195,11 @@ void task_init_1ms(void)
         printf("Ganancias FCS: K_r=%.3f tau_wo=%.3f K_p=%.3f K_phi=%.3f K_psi=%.3f phi_max=%.1f deg\n",
                fm_cfg.lat.K_r, fm_cfg.lat.tau_wo_s, fm_cfg.lat.K_p,
                fm_cfg.lat.K_phi, fm_cfg.lat.K_psi, fm_cfg.max_bank_deg);
+        FM_Status fm_init_status;
+        FM_GetStatus(&fm_init_status);
         printf("Filtro de giros: fc = %.1f, %.1f, %.1f Hz\n",
-               g_gyro_filter.eje[0].fc_hz, g_gyro_filter.eje[1].fc_hz, g_gyro_filter.eje[2].fc_hz);
-        printf("Filtro de pitot: fc = %.1f Hz\n", g_pitot_filter.fc_hz);
+               fm_init_status.gyro_fc_hz[0], fm_init_status.gyro_fc_hz[1], fm_init_status.gyro_fc_hz[2]);
+        printf("Filtro de pitot: fc = %.1f Hz\n", fm_init_status.pitot_fc_hz);
 
         printf("Actuadores inicializados:\n");
         printf("  Aileron:  %.2f deg\n", g_act.aileron);
@@ -286,7 +277,7 @@ int main(int argc, char **argv)
         print_params(&g_params);
     #endif
 
-    /* Loop de simulación: por ejemplo 60 segundos a 1 ms */
+    /* Loop de simulación: SIMULATION_TIME_ms (sim_settings.h) a pasos de 1 ms */
     const uint32_t t_end_ms = g_Total_Time_ms;
     while (SimTM_NowMs() < t_end_ms)
     {
@@ -320,261 +311,247 @@ static void aplicar_trim_servo(ServoCfg_s cfg[SERVO_SIM_N_SERVOS], int canal, fl
     cfg[canal].y0_deg = trim_deg;
 }
 
+/* Muestra del arnés en un tick de 1 ms: lo que leen el log y la consola */
+typedef struct
+{
+    float  y_elev, y_ail, y_rud, y_thro;   // salidas de los servos [deg]
+    float  u_elev, u_ail, u_rud, u_thro;   // comandos efectivos [us]
+    double du, dw, dq, dtheta;             // estado longitudinal
+    double X_lat[DYN_N_LAT];               // estado lateral (0 con SIL_CONFIG_LATERAL == 0)
+} ArnesMuestra;
+
+/* Fase 1: piloto simulado -> canales RC (g_rc_sim, los lee Task_5ms) */
+static pilotcommand_s arnes_piloto(uint32_t now_ms)
+{
+    const pilotcommand_s pilot = pilot_source_commands(now_ms, SIM_PILOT_ROUTINE);
+    g_rc_sim = rc_source(pilot);
+    return pilot;
+}
+
+/* Fase 2: servos -> actuadores -> planta (FlightSim_Step).
+   NOTA: el estado (du..dtheta, X_lat) se lee ANTES de FlightSim_Step y los
+   sensores (fase 3) DESPUÉS: en la misma fila del CSV el estado corresponde a
+   t - 1 ms y los sensores a t. Corregirlo cambia el CSV: ver TODO 9.1. */
+static void arnes_servos_planta(float dt_s, ArnesMuestra *m)
+{
+    Servos_Update_1ms();
+
+    /* Salidas de los servos (en grados o valor normalizado) */
+    m->y_elev = Servos_GetOutDeg(SERVO_ELEVATOR);
+    m->y_ail  = Servos_GetOutDeg(SERVO_AILERON);
+    m->y_rud  = Servos_GetOutDeg(SERVO_RUDDER);
+    m->y_thro = Servos_GetOutDeg(SERVO_THROTTLE);
+
+    /* Comandos efectivos (con saturación, etc.) */
+    m->u_elev = Servos_GetCmdDeltaUs(SERVO_ELEVATOR);
+    m->u_ail  = Servos_GetCmdDeltaUs(SERVO_AILERON);
+    m->u_rud  = Servos_GetCmdDeltaUs(SERVO_RUDDER);
+    m->u_thro = Servos_GetCmdDeltaUs(SERVO_THROTTLE);
+
+    m->du     = g_sim.X_lon[0];
+    m->dw     = g_sim.X_lon[1];
+    m->dq     = g_sim.X_lon[2];
+    m->dtheta = g_sim.X_lon[3];
+    FlightSim_GetX_lat(&g_sim, m->X_lat);
+
+    FlightSim_GetActuators(&g_act, m->y_ail, m->y_elev, m->y_rud, m->y_thro);
+    FlightSim_SetActuatorsFromFM(&g_sim, &g_act);
+    FlightSim_Step(&g_sim, dt_s);
+}
+
+/* Fase 3: sensores desde la planta ya integrada (g_sens_data) */
+static void arnes_sensores(float dt_s)
+{
+    SensorsSim_Update(&g_sensors, &g_sim, dt_s);
+    SensorsSim_GetData(&g_sensors, &g_sens_data);
+}
+
+#if (SYSTEM_SIM_ENV == SIM_PLATFORM_PC)
+/* Fase 4: una fila del CSV (el esquema no cambia: ver el header en
+   task_init_1ms) */
+static void arnes_log_csv(uint32_t now_ms, float t_s,
+                          const pilotcommand_s *pilot, const ArnesMuestra *m)
+{
+    if (g_fp == NULL) return;
+
+    FM_Status fm_status;
+    FM_GetStatus(&fm_status);
+
+    /* Formato CSV con todas las señales:
+       tiempo,
+       comandos_us: elev, ail, rud, thro,
+       salidas_deg: elev, ail, rud, thro,
+       valores_rc: pitch, roll, yaw, throttle, flaps, mode, arm,
+       comandos_originales: roll, pitch, yaw, throttle del piloto */
+        fprintf(g_fp,
+                "%.6f,"   // t_s
+                "%.3f,%.3f,%.3f,%.3f,"   // elev_cmd_us, ail_cmd_us, rud_cmd_us, thro_cmd_us
+                "%.6f,%.6f,%.6f,%.6f,%.3f," // rc_pitch, rc_roll, rc_yaw, rc_throttle, rc_flaps
+                "%.3f,%.3f,%.3f,%.3f,"   // y_elev_deg, y_ail_deg, y_rud_deg, y_thro_perc
+                "%.3f,%.3f,%.3f,%.3f,"   // u_elev_us, u_ail_us, u_rud_us, u_thro_us
+                "%.3f,%.3f,%.3f,%.3f,"   // pilot_roll, pilot_pitch, pilot_yaw, pilot_throttle
+                "%.0f,%.0f,"             // mode, arm
+                "%.6f,%.6f,%.6f,%.6f,"  // du, dw, dq, dtheta
+                "%.6f,%.6f,%.6f,%.6f,%.6f,"  // IAS, TAS, Δp, AoA, SideSlip
+                "%.6f,%.6f,%.6f,"       // giros [rad/s]
+                "%.6f,%.6f,%.6f,"       // acelerometros [m/s^2]
+                "%.7f,%.7f,%.3f,"       // gps lat, lon [deg] (1e-7 deg ~ 1 cm), alt
+                "%.3f,%.3f,%.3f,"       // gps vn ve vd
+                "%.6f,"                 // Laser
+                "%.6f,%.6f,%.6f,%.6f,%.6f,"  // dv, dp, dr, dphi, dpsi
+                "%.6f,%.6f,%.6f,"            // AHRS phi, theta, psi [deg]
+                "%d,"                        // yaw_mode
+                "%.6f,%.6f,%.6f,"            // giros filtrados [rad/s]
+                "%.3f,%.3f,%.3f,"            // corte aplicado [Hz]
+                "%.6f,%.6f,"                 // r lavada [deg/s], delta_r de la ley [deg]
+                "%.6f,%.3f\n",               // IAS filtrada [m/s], corte aplicado [Hz]
+                (double)t_s,                                            // 1. tiempo
+                (double)m->u_elev, (double)m->u_ail,                          // comandos us
+                (double)m->u_rud,  (double)m->u_thro,
+                (double)g_rc_sim.s[RC_CH_PITCH],                          // 6. valores RC
+                (double)g_rc_sim.s[RC_CH_ROLL],
+                (double)g_rc_sim.s[RC_CH_YAW],
+                (double)g_rc_sim.s[RC_CH_THROTTLE],
+                (double)g_rc_sim.s[RC_CH_FLAPS],
+                g_act.elevator, g_act.aileron,                          //11. salidas deg servo - superficie d control
+                g_act.rudder,  g_act.throttle,
+                (double)m->u_elev, (double)m->u_ail,                          // 15. señal norm servos deg
+                (double)m->u_rud,  (double)m->u_thro,
+                (double)pilot->roll, (double)pilot->pitch,                // 19. comandos originales
+                (double)pilot->yaw, (double)pilot->throttle,
+                (double)FM_GetMode(), (double)pilot->arm_switch,         // modo activo (FM_Mode), armado
+                (double)m->du,(double)m->dw,(double)m->dq,(double)m->dtheta ,      // du, dw, dq, dtheta
+
+                (double)g_sens_data.pitot.ias_ms,                       // IAS
+                (double)g_sens_data.pitot.tas_ms,                       // TAS
+                (double)g_sens_data.pitot.diff_pressure_pa,             // Δp
+                (double)g_sens_data.vane.AngleOfAttack_deg,
+                (double)g_sens_data.vane.SideSlipAngle_deg,
+
+                (double)g_sens_data.imu.gyro_radps.x,                   // giros
+                (double)g_sens_data.imu.gyro_radps.y,
+                (double)g_sens_data.imu.gyro_radps.z,
+
+                (double)g_sens_data.imu.accel_mps2.x,                   // acelerometros
+                (double)g_sens_data.imu.accel_mps2.y,
+                (double)g_sens_data.imu.accel_mps2.z,
+
+                (double)g_sens_data.gps.lat_deg,                        // gps data
+                (double)g_sens_data.gps.lon_deg,
+                (double)g_sens_data.gps.alt_m,
+
+                (double)g_sens_data.gps.vn_ms,                          // gps vn ve vd
+                (double)g_sens_data.gps.ve_ms,
+                (double)g_sens_data.gps.vd_ms,
+
+                (double)g_sens_data.laser.range_m,                      // Laser
+
+                m->X_lat[0], m->X_lat[1], m->X_lat[2], m->X_lat[3], m->X_lat[4],       // dv, dp, dr, dphi, dpsi
+
+                g_sens_data.ahrs.phi_deg, g_sens_data.ahrs.theta_deg,   // AHRS
+                g_sens_data.ahrs.psi_deg,
+
+                (int)fm_status.yaw_mode,
+
+                fm_status.gyro_filt_radps[0], fm_status.gyro_filt_radps[1],
+                fm_status.gyro_filt_radps[2],
+                (double)fm_status.gyro_fc_hz[0], (double)fm_status.gyro_fc_hz[1],
+                (double)fm_status.gyro_fc_hz[2],
+
+                (double)fm_status.yd_r_wo_dps, (double)fm_status.yd_dr_deg,
+
+                /* Antes de la primera corrida del filtro (t = 5 ms) se registra
+                   la medición: un 0 se vería como un salto de 24 m/s en el log */
+                fm_status.pitot_con_muestra ? fm_status.pitot_filt_ms
+                                            : (double)g_sens_data.pitot.ias_ms,
+                (double)fm_status.pitot_fc_hz );
+
+    /* Flush cada 100 ms */
+    if ((now_ms % 100u) == 0u) {
+        fflush(g_fp);
+    }
+}
+
+/* Fase 5: consola cada 50 ms */
+static void arnes_consola(uint32_t now_ms, float t_s, const ArnesMuestra *m)
+{
+    if ((now_ms % 50u) == 0u)
+    {
+        printf("t=%.3f | CMD[us]: E=%.1f A=%.1f R=%.1f T=%.1f | OUT[deg]: E=%.2f A=%.2f R=%.2f T=%.2f\n",
+               (double)t_s,
+               (double)m->u_elev, (double)m->u_ail, (double)m->u_rud, (double)m->u_thro,
+               (double)m->y_elev, (double)m->y_ail, (double)m->y_rud, (double)m->y_thro);
+    }
+}
+#endif
+
+/* Arnés del SIL a 1 ms: piloto -> servos y planta -> sensores -> log */
 static void Task_1ms(uint32_t now_ms, uint32_t dt_ms)
 {
     const float dt_s = (float)dt_ms * 0.001f;
-    const float t_s = (float)now_ms * 0.001f;
-    static pilotcommand_s pilot;
+    const float t_s  = (float)now_ms * 0.001f;
+    ArnesMuestra m;
 
-     /* Comandos ejemplo (delta PWM us respecto a 1500) */
+    const pilotcommand_s pilot = arnes_piloto(now_ms);
+    arnes_servos_planta(dt_s, &m);
+    arnes_sensores(dt_s);
 
-     pilot = pilot_source_commands(now_ms, SIM_PILOT_ROUTINE);
-
-     g_rc_sim = rc_source(pilot);
-
-     /* “Tarea” 1 ms */
-     Servos_Update_1ms();
-
-     /* Leer salidas */
-     /* Leer salidas de los servos (en grados o valor normalizado) */
-     float y_elev = Servos_GetOutDeg(SERVO_ELEVATOR);
-     float y_ail  = Servos_GetOutDeg(SERVO_AILERON);
-     float y_rud  = Servos_GetOutDeg(SERVO_RUDDER);
-     float y_thro = Servos_GetOutDeg(SERVO_THROTTLE);
-
-     /* También leer los comandos efectivos (con saturación, etc.) */
-     float u_elev = Servos_GetCmdDeltaUs(SERVO_ELEVATOR);
-     float u_ail  = Servos_GetCmdDeltaUs(SERVO_AILERON);
-     float u_rud  = Servos_GetCmdDeltaUs(SERVO_RUDDER);
-     float u_thro = Servos_GetCmdDeltaUs(SERVO_THROTTLE);
-
-     double du     = g_sim.X_lon[0];
-     double dw     = g_sim.X_lon[1];
-     double dq     = g_sim.X_lon[2];
-     double dtheta = g_sim.X_lon[3];
-
-     /* Estado lateral-direccional (queda en 0 con SIL_CONFIG_LATERAL == 0) */
-     double X_lat[DYN_N_LAT];
-     FlightSim_GetX_lat(&g_sim, X_lat);
-
-     FlightSim_GetActuators(&g_act, y_ail, y_elev, y_rud, y_thro);
-     FlightSim_SetActuatorsFromFM(&g_sim, &g_act);
-     FlightSim_Step(&g_sim, dt_s);
-
-    SensorsSim_Update(&g_sensors, &g_sim, dt_s);
-    SensorsSim_GetData(&g_sensors, &g_sens_data);
-
-
-     #if (SYSTEM_SIM_ENV == SIM_PLATFORM_PC)
-        /* Logging CSV: tiempo, elev_cmd, u_elev, y_elev */
-        if (g_fp != NULL)
-        {
-
-            FM_Status fm_status;
-            FM_GetStatus(&fm_status);
-
-            /* Formato CSV con todas las señales:
-               tiempo,
-               comandos_us: elev, ail, rud, thro,
-               salidas_deg: elev, ail, rud, thro,
-               valores_rc: pitch, roll, yaw, throttle, flaps, mode, arm,
-               comandos_originales: roll, pitch, yaw, throttle del piloto */
-
-
-            fprintf(g_fp,
-                    "%.6f,"   // t_s
-                    "%.3f,%.3f,%.3f,%.3f,"   // elev_cmd_us, ail_cmd_us, rud_cmd_us, thro_cmd_us
-                    "%.6f,%.6f,%.6f,%.6f,%.3f," // rc_pitch, rc_roll, rc_yaw, rc_throttle, rc_flaps
-                    "%.3f,%.3f,%.3f,%.3f,"   // y_elev_deg, y_ail_deg, y_rud_deg, y_thro_perc
-                    "%.3f,%.3f,%.3f,%.3f,"   // u_elev_us, u_ail_us, u_rud_us, u_thro_us
-                    "%.3f,%.3f,%.3f,%.3f,"   // pilot_roll, pilot_pitch, pilot_yaw, pilot_throttle
-                    "%.0f,%.0f,"             // mode, arm
-                    "%.6f,%.6f,%.6f,%.6f,"  // du, dw, dq, dtheta
-                    "%.6f,%.6f,%.6f,%.6f,%.6f,"  // IAS, TAS, Δp, AoA, SideSlip
-                    "%.6f,%.6f,%.6f,"       // giros [rad/s]
-                    "%.6f,%.6f,%.6f,"       // acelerometros [m/s^2]
-                    "%.7f,%.7f,%.3f,"       // gps lat, lon [deg] (1e-7 deg ~ 1 cm), alt
-                    "%.3f,%.3f,%.3f,"       // gps vn ve vd
-                    "%.6f,"                 // Laser
-                    "%.6f,%.6f,%.6f,%.6f,%.6f,"  // dv, dp, dr, dphi, dpsi
-                    "%.6f,%.6f,%.6f,"            // AHRS phi, theta, psi [deg]
-                    "%d,"                        // yaw_mode
-                    "%.6f,%.6f,%.6f,"            // giros filtrados [rad/s]
-                    "%.3f,%.3f,%.3f,"            // corte aplicado [Hz]
-                    "%.6f,%.6f,"                 // r lavada [deg/s], delta_r de la ley [deg]
-                    "%.6f,%.3f\n",               // IAS filtrada [m/s], corte aplicado [Hz]
-                    (double)t_s,                                            // 1. tiempo
-                    (double)u_elev, (double)u_ail,                          // comandos us
-                    (double)u_rud,  (double)u_thro,
-                    (double)g_rc_sim.s[RC_CH_PITCH],                          // 6. valores RC
-                    (double)g_rc_sim.s[RC_CH_ROLL],
-                    (double)g_rc_sim.s[RC_CH_YAW],
-                    (double)g_rc_sim.s[RC_CH_THROTTLE],
-                    (double)g_rc_sim.s[RC_CH_FLAPS],
-                    g_act.elevator, g_act.aileron,                          //11. salidas deg servo - superficie d control
-                    g_act.rudder,  g_act.throttle,
-                    (double)u_elev, (double)u_ail,                          // 15. señal norm servos deg
-                    (double)u_rud,  (double)u_thro,
-                    (double)pilot.roll, (double)pilot.pitch,                // 19. comandos originales
-                    (double)pilot.yaw, (double)pilot.throttle,
-                    (double)FM_GetMode(), (double)pilot.arm_switch,         // modo activo (FM_Mode), armado
-                    (double)du,(double)dw,(double)dq,(double)dtheta ,      // du, dw, dq, dtheta
-
-                    (double)g_sens_data.pitot.ias_ms,                       // IAS
-                    (double)g_sens_data.pitot.tas_ms,                       // TAS
-                    (double)g_sens_data.pitot.diff_pressure_pa,             // Δp
-                    (double)g_sens_data.vane.AngleOfAttack_deg,
-                    (double)g_sens_data.vane.SideSlipAngle_deg,
-
-                    (double)g_sens_data.imu.gyro_radps.x,                   // giros
-                    (double)g_sens_data.imu.gyro_radps.y,
-                    (double)g_sens_data.imu.gyro_radps.z,
-
-                    (double)g_sens_data.imu.accel_mps2.x,                   // acelerometros
-                    (double)g_sens_data.imu.accel_mps2.y,
-                    (double)g_sens_data.imu.accel_mps2.z,
-
-                    (double)g_sens_data.gps.lat_deg,                        // gps data
-                    (double)g_sens_data.gps.lon_deg,
-                    (double)g_sens_data.gps.alt_m,
-
-                    (double)g_sens_data.gps.vn_ms,                          // gps vn ve vd
-                    (double)g_sens_data.gps.ve_ms,
-                    (double)g_sens_data.gps.vd_ms,
-
-                    (double)g_sens_data.laser.range_m,                      // Laser
-
-                    X_lat[0], X_lat[1], X_lat[2], X_lat[3], X_lat[4],       // dv, dp, dr, dphi, dpsi
-
-                    g_sens_data.ahrs.phi_deg, g_sens_data.ahrs.theta_deg,   // AHRS
-                    g_sens_data.ahrs.psi_deg,
-
-                    (int)fm_status.yaw_mode,
-
-                    g_gyro_filt_radps[0], g_gyro_filt_radps[1], g_gyro_filt_radps[2],
-                    (double)g_gyro_filter.eje[0].fc_hz, (double)g_gyro_filter.eje[1].fc_hz,
-                    (double)g_gyro_filter.eje[2].fc_hz,
-
-                    (double)fm_status.yd_r_wo_dps, (double)fm_status.yd_dr_deg,
-
-                    /* Antes de la primera corrida del filtro (t = 5 ms) se registra
-                       la medición: un 0 se vería como un salto de 24 m/s en el log */
-                    g_pitot_filter.con_muestra ? g_pitot_filt_ms : (double)g_sens_data.pitot.ias_ms,
-                    (double)g_pitot_filter.fc_hz );
-
-            /* Flush cada 100 ms */
-            if ((now_ms % 100u) == 0u) {
-                fflush(g_fp);
-            }
-        }
-
-        /* Consola cada 50 ms */
-        if ((now_ms % 50u) == 0u)
-        {
-            printf("t=%.3f | CMD[us]: E=%.1f A=%.1f R=%.1f T=%.1f | OUT[deg]: E=%.2f A=%.2f R=%.2f T=%.2f\n",
-                   (double)t_s,
-                   (double)u_elev, (double)u_ail, (double)u_rud, (double)u_thro,
-                   (double)y_elev, (double)y_ail, (double)y_rud, (double)y_thro);
-        }
+    #if (SYSTEM_SIM_ENV == SIM_PLATFORM_PC)
+        arnes_log_csv(now_ms, t_s, &pilot, &m);
+        arnes_consola(now_ms, t_s, &m);
+    #else
+        (void)t_s; (void)pilot;
     #endif
 }
 
-/* Estado para el FM desde los sensores (FM_State va en grados y deg/s).
-   La IMU muestrea en t = 1, 6, 11 ms y Task_5ms corre en t = 5, 10, 15 ms: los
-   giros llegan con 4 ms de antigüedad, despreciable frente a los 160 ms de
-   retardo que tolera el diseño (control_lateral.tex). */
-static FM_State fm_state_desde_sensores(const SensorsSimData *d,
-                                        const double gyro_radps[GYRO_FILTER_N_EJES])
+/* Arnés: traduce los datos del simulador a las entradas de sensores del
+   software de vuelo. Copia los campos sin convertir tipos. */
+static FC_SensorsIn fc_sensores_desde_sim(const SensorsSimData *d)
 {
-    const double rad2deg = 180.0 / SENSORS_SIM_PI;
-    const FM_State st = {
-        .phi_deg   = (float)d->ahrs.phi_deg,
-        .theta_deg = (float)d->ahrs.theta_deg,
-        .psi_deg   = (float)d->ahrs.psi_deg,
-        .p_dps     = (float)(gyro_radps[0] * rad2deg),
-        .q_dps     = (float)(gyro_radps[1] * rad2deg),
-        .r_dps     = (float)(gyro_radps[2] * rad2deg),
-        .alt_m     = (float)d->gps.alt_m,
-        .vz_ms     = (float)(-d->gps.vd_ms),
-        .arsp_ms   = (float)g_pitot_filt_ms,
-        .valid     = d->imu.valid && d->ahrs.valid,
+    const FC_SensorsIn sens = {
+        .gyro_radps     = { d->imu.gyro_radps.x, d->imu.gyro_radps.y, d->imu.gyro_radps.z },
+        .imu_valid      = d->imu.valid,
+        .ahrs_phi_deg   = d->ahrs.phi_deg,
+        .ahrs_theta_deg = d->ahrs.theta_deg,
+        .ahrs_psi_deg   = d->ahrs.psi_deg,
+        .ahrs_valid     = d->ahrs.valid,
+        .pitot_ias_ms   = d->pitot.ias_ms,
+        .pitot_valid    = d->pitot.valid,
+        .gps_alt_m      = d->gps.alt_m,
+        .gps_vd_ms      = d->gps.vd_ms,
     };
-    return st;
+    return sens;
 }
 
+/* Adaptador del software de vuelo: entradas desde el simulador ->
+   Flight_Task_5ms -> servos. Toma los canales RC que Task_1ms ya actualizó en
+   este tick; el servo retiene el comando 5 ms y lo ve a partir del siguiente
+   tick. */
 static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
 {
-    (void)now_ms;
-    const float dt_s = (float)dt_ms * 0.001f;
-
-    /* Software de vuelo (lo que correria en el embebido). Toma los canales RC
-       que Task_1ms ya actualizo en este tick; el servo retiene el comando 5 ms
-       y lo ve a partir del siguiente tick. */
-    float flaps_cmd    = g_rc_sim.s[RC_CH_FLAPS];
-    int mode_cmd       = (int)g_rc_sim.s[RC_CH_MODE];
-    bool arm_cmd       = (g_rc_sim.s[RC_CH_ARM] > 0.5f);
-    (void)flaps_cmd;  // sin superficie de flaps en la planta
-
-    /* Flight management: sticks -> comandos de superficie. En MANUAL pasan
-       sin cambios; el modo pedido se ignora si aún no está implementado. */
-    FM_SetArmed(arm_cmd);
-    FM_SetModeSwitch(mode_cmd);
-    const FM_CommandsNorm fm_in = {
-        .roll_norm  = g_rc_sim.s[RC_CH_ROLL],
-        .pitch_norm = g_rc_sim.s[RC_CH_PITCH],
-        .yaw_norm   = g_rc_sim.s[RC_CH_YAW],
-        .throttle   = g_rc_sim.s[RC_CH_THROTTLE],
-    };
-    const double gyro_radps[GYRO_FILTER_N_EJES] = {
-        g_sens_data.imu.gyro_radps.x,
-        g_sens_data.imu.gyro_radps.y,
-        g_sens_data.imu.gyro_radps.z,
-    };
-    GyroFilter_Update(&g_gyro_filter, gyro_radps, (double)dt_s, g_gyro_filt_radps);
-
-    /* Sin medición válida se retiene el último valor */
-    if (g_sens_data.pitot.valid) {
-        g_pitot_filt_ms = Lpf1_Update(&g_pitot_filter, g_sens_data.pitot.ias_ms, (double)dt_s);
-    }
-
-    const FM_State fm_st = fm_state_desde_sensores(&g_sens_data, g_gyro_filt_radps);
-    FM_Update_5ms(&fm_in, &fm_st, dt_s);
-
-    FM_CommandsNorm fm_out;
-    FM_GetCmdOut(&fm_out);
-    SimRc_s rc_fm = g_rc_sim;
-    rc_fm.s[RC_CH_ROLL]     = fm_out.roll_norm;
-    rc_fm.s[RC_CH_PITCH]    = fm_out.pitch_norm;
-    rc_fm.s[RC_CH_YAW]      = fm_out.yaw_norm;
-    rc_fm.s[RC_CH_THROTTLE] = fm_out.throttle;
-
-    /* Canales -> delta PWM [us] por servo, con trim del transmisor */
+    const FC_SensorsIn sens = fc_sensores_desde_sim(&g_sens_data);
     float servo_cmd_us[SERVO_SIM_N_SERVOS];
-    rc_to_servo_cmds_us(&rc_fm, g_trim_us, servo_cmd_us);
-
-    /* Enviar comandos a los servos/actuadores */
+    Flight_Task_5ms(now_ms, dt_ms, &g_rc_sim, (int)g_rc_sim.s[RC_CH_MODE],
+                    &sens, servo_cmd_us);
     for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
         Servos_SetCmdDeltaUs(i, servo_cmd_us[i]);
     }
 }
 
+/* Tareas lentas: el software de vuelo vive en flight_management.c */
 static void Task_30ms(uint32_t now_ms, uint32_t dt_ms)
 {
-    (void)now_ms; (void)dt_ms;
-    /* Outer loop actitud / setpoint shaping / FBW */
+    Flight_Task_30ms(now_ms, dt_ms);
 }
 
 static void Task_150ms(uint32_t now_ms, uint32_t dt_ms)
 {
-    (void)now_ms; (void)dt_ms;
-    /* Navegación / ALT_HOLD / ARSP_HOLD (setpoints lentos) */
+    Flight_Task_150ms(now_ms, dt_ms);
 }
 
 static void Task_500ms(uint32_t now_ms, uint32_t dt_ms)
 {
-    (void)dt_ms;
-    /* Logging / telemetría / health */
-    /* printf("[t=%ums] phi=%.2f theta=%.2f psi=%.2f\n", now_ms, g_st.phi_deg, g_st.theta_deg, g_st.psi_deg); */
+    Flight_Task_500ms(now_ms, dt_ms);
 }
 
 

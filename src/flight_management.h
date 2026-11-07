@@ -1,8 +1,29 @@
 #ifndef FLIGHT_MANAGEMENT_H
 #define FLIGHT_MANAGEMENT_H
 
+/* ============================================================
+ * Software de vuelo (portable al STM32)
+ * ============================================================
+ * flight_management.c administra el software de vuelo: expone una tarea por
+ * periodo del RTOS (Flight_Task_5ms/30ms/150ms/500ms) y decide qué leyes de
+ * control corren según el modo. Cada ley vive en su propio cl_<ley>.c/.h.
+ *
+ * Patrón para agregar una ley de control:
+ *   1. cl_<ley>.c/.h con struct de estado, Reset y Update en unidades
+ *      físicas (deg, deg/s, s). La ley no conoce modos, RC ni validez del
+ *      estado (ejemplo: cl_yaw_damper.c/.h).
+ *   2. Instancia static en flight_management.c, con Reset en FM_Init y al
+ *      salir del modo.
+ *   3. Llamada desde la Flight_Task_* del periodo que le toca, dentro del
+ *      switch de modo. El FM convierte a stick y revisa la validez del estado.
+ *   4. Telemetría en FM_Status.
+ *   5. test/test_cl_<ley>.c, más un test de lazo cerrado si aplica.
+ */
+
 #include <stdint.h>
 #include <stdbool.h>
+
+#include "rc_mixer.h"          // SimRc_s, SERVO_SIM_N_SERVOS
 
 
 #ifdef __cplusplus
@@ -65,6 +86,24 @@ typedef struct
 
     bool  valid;
 } FM_State;
+
+/* =========================
+ * Entradas de sensores
+ * =========================
+ * Entradas de sensores del software de vuelo. En el SIL las llena main.c desde
+ * SensorsSimData; en el STM32, los drivers. Mismos tipos que SensorsSimData
+ * para conservar la regresión bit a bit. */
+typedef struct
+{
+    double gyro_radps[3];   // x, y, z
+    bool   imu_valid;
+    double ahrs_phi_deg, ahrs_theta_deg, ahrs_psi_deg;
+    bool   ahrs_valid;
+    double pitot_ias_ms;
+    bool   pitot_valid;
+    double gps_alt_m;
+    double gps_vd_ms;
+} FC_SensorsIn;
 
 /* =========================
  * Actuadores (salida final)
@@ -148,6 +187,10 @@ typedef struct
     // Corte del filtro de la velocidad del pitot [Hz]; 0 = sin filtro
     float pitot_fc_hz;
 
+    // Trim del transmisor [us] por servo (índice ServoChannel_e); lo suma la
+    // mezcla a us de Flight_Task_5ms
+    float trim_us[SERVO_SIM_N_SERVOS];
+
     // Failsafe
     float failsafe_thr;     // [0,1]
 } FM_Config;
@@ -175,17 +218,38 @@ typedef struct
     // Yaw damper (en 0 si no está activo)
     float yd_r_wo_dps;      // r lavada
     float yd_dr_deg;        // delta_r de la ley, respecto al trim
+
+    // Filtros de Flight_Task_5ms (telemetría: log y consola)
+    double gyro_filt_radps[3];  // giros filtrados x, y, z
+    float  gyro_fc_hz[3];       // corte aplicado (tras el límite de Lpf1)
+    double pitot_filt_ms;       // IAS filtrada (retiene el último valor sin medición válida)
+    float  pitot_fc_hz;         // corte aplicado
+    bool   pitot_con_muestra;   // false hasta la primera medición válida
 } FM_Status;
+
 /* ============================================================
- * Ejecuciones por cascada
+ * Tareas del software de vuelo
  * ============================================================ */
 
- void Flight_Control_Attitude_Tier(void);
+/* Tarea de 5 ms: modo y armado -> filtros (giros, pitot) -> FM_State ->
+   leyes según el modo (FM_Update_5ms) -> mezcla a us con trim.
+   mode_cmd es el switch de modo pedido (ver FM_SetModeSwitch); manda sobre
+   rc_sim->s[RC_CH_MODE]. El armado sale de rc_sim->s[RC_CH_ARM] > 0.5.
+   servo_cmd_us: delta PWM [us] por servo (índice ServoChannel_e), trim incluido.
+   Con algún puntero NULL no hace nada (servo_cmd_us no se escribe). */
+void Flight_Task_5ms(uint32_t now_ms, uint32_t dt_ms,
+                     const SimRc_s *rc_sim, int mode_cmd,
+                     const FC_SensorsIn *sens,
+                     float servo_cmd_us[SERVO_SIM_N_SERVOS]);
 
- void Flight_Control_Cruice_Tier(void);
+/* Tarea de 30 ms (vacía por ahora): lazo externo de actitud, wing leveler (F5) */
+void Flight_Task_30ms(uint32_t now_ms, uint32_t dt_ms);
 
- void Flight_Control_Mission_Tier(void);
+/* Tarea de 150 ms (vacía por ahora): rumbo y navegación, heading hold (F6) */
+void Flight_Task_150ms(uint32_t now_ms, uint32_t dt_ms);
 
+/* Tarea de 500 ms (vacía por ahora): health y telemetría */
+void Flight_Task_500ms(uint32_t now_ms, uint32_t dt_ms);
 
 /* =========================
  * API

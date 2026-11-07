@@ -24,11 +24,13 @@ add_executable(SIL_Flight_Control
     src/dynamics.c
     src/aircraft_loader.c
     src/atmosphere.c
+    src/cl_yaw_damper.c
     src/flight_management.c
     src/flight_sim.c
     src/gyro_filter.c
     src/lpf1.c
     src/pilot_sim.c
+    src/rc_mixer.c
     src/sensors_sim.c
     src/servo_sim.c
     src/sim_PWM_processing.c
@@ -135,9 +137,13 @@ if(SIL_BUILD_TESTS)
         src/aircraft_loader.c
         src/atmosphere.c
         src/dynamics.c
+        src/cl_yaw_damper.c
         src/flight_management.c
         src/flight_sim.c
+        src/gyro_filter.c
+        src/lpf1.c
         src/pilot_sim.c
+        src/rc_mixer.c
         src/servo_sim.c
     )
     target_include_directories(test_yaw_damper_cl PRIVATE src test)
@@ -160,6 +166,7 @@ if(SIL_BUILD_TESTS)
     add_executable(test_pilot_lateral_servo
         test/test_pilot_lateral_servo.c
         src/pilot_sim.c
+        src/rc_mixer.c
         src/servo_sim.c
         src/flight_sim.c
         src/dynamics.c
@@ -217,10 +224,24 @@ if(SIL_BUILD_TESTS)
 
     add_executable(test_flight_management
         test/test_flight_management.c
+        src/cl_yaw_damper.c
+        src/dynamics.c
         src/flight_management.c
+        src/gyro_filter.c
+        src/lpf1.c
+        src/rc_mixer.c
     )
     target_include_directories(test_flight_management PRIVATE src test)
     target_compile_options(test_flight_management PRIVATE -Wall)
     target_link_libraries(test_flight_management PRIVATE m)
     add_test(NAME test_flight_management COMMAND test_flight_management)
+
+    add_executable(test_cl_yaw_damper
+        test/test_cl_yaw_damper.c
+        src/cl_yaw_damper.c
+    )
+    target_include_directories(test_cl_yaw_damper PRIVATE src test)
+    target_compile_options(test_cl_yaw_damper PRIVATE -Wall)
+    target_link_libraries(test_cl_yaw_damper PRIVATE m)
+    add_test(NAME test_cl_yaw_damper COMMAND test_cl_yaw_damper)
 endif()

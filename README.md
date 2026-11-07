@@ -29,7 +29,7 @@ vuelo nivelado, pasadas a ejes cuerpo; ver
 ```
 SIL_Flight_Control/
 ├── CMakeLists.txt      Configuración de compilación
-├── src/                Código C (10 módulos)
+├── src/                Código C
 ├── python/             Scripts de análisis y graficación
 ├── dynamics/           Estimación de derivadas lateral-direccionales (Python)
 ├── flightreview/       Visor interactivo de logs (servidor Bokeh + reporte HTML)
@@ -42,7 +42,8 @@ SIL_Flight_Control/
 |------------------------|-------------------------------------------------------|
 | `main.c`               | Entrada, registro de tareas, logging del CSV          |
 | `sim_task_management`  | Scheduler cooperativo 1 / 5 / 30 / 150 / 500 ms       |
-| `pilot_sim`            | Piloto simulado: escalones, mapeo a canales RC        |
+| `pilot_sim`            | Piloto simulado: rutinas de escalones → canales RC    |
+| `rc_mixer`             | Canales RC y mezcla stick → µs con trim (software de vuelo) |
 | `servo_sim`            | Servos de 1er orden con RK4 y limitador de velocidad  |
 | `flight_sim`           | Planta: estado, actuadores, paso de integración       |
 | `dynamics`             | Matrices A/B lon y lat, RK4 (4x1 y n/m), señales      |
@@ -50,9 +51,71 @@ SIL_Flight_Control/
 | `sensors_sim`          | Pitot, veleta (α, β), IMU, GPS y láser, ruido y bias  |
 | `imu_sensor.h`         | Ruido de la IMU ajustado a un log de vuelo            |
 | `atmosphere`           | Densidad ISA (troposfera), igual a `dynamics/`        |
-| `flight_management`    | Capa de control: modo MANUAL (paso directo); lazos en el Paso 4 |
+| `flight_management`    | Software de vuelo: `Flight_Task_*`, modos, filtros, leyes |
+| `cl_yaw_damper`        | Ley del yaw damper (washout + ganancia)               |
+| `gyro_filter`, `lpf1`  | Filtro de 1er orden de giros y de la IAS del pitot    |
 | `sim_PWM_processing`   | Banco de canales PWM (compilado, aún sin usar)        |
 | `sim_settings.h`       | Selección de plataforma y tiempo de simulación        |
+
+## Arquitectura de tareas
+
+`main.c` es el **arnés del SIL** y `flight_management.c` administra el
+**software de vuelo** (lo que correría en el STM32). El arnés arma las
+entradas desde el simulador, llama a una tarea del FM por periodo del RTOS y
+entrega los µs a los servos.
+
+```
+              ARNÉS SIL (main.c)                     SOFTWARE DE VUELO (portable a STM32)
+ ┌──────────────────────────────────────┐       ┌─────────────────────────────────────────────┐
+ │ Task_1ms: piloto → RC → servos →     │       │ flight_management.c                          │
+ │           planta → sensores → CSV    │       │   Flight_Task_5ms(now, dt, rc, mode, sens,   │
+ │                                      │  rc   │                   servo_cmd_us)              │
+ │ Task_5ms:                            │──────▶│     modo/armado → filtros (giros, pitot)    │
+ │   rc   = g_rc_sim                    │ sens  │     → FM_State → leyes según el modo         │
+ │   sens = fc_sensores_desde_sim(...)  │──────▶│        └─ cl_yaw_damper.c  (cl_*.c futuras) │
+ │   Flight_Task_5ms(...)               │  µs   │     → rc_mixer.c (stick → µs + trim)        │
+ │   Servos_SetCmdDeltaUs(µs)           │◀──────│                                             │
+ │ Task_30/150/500ms → Flight_Task_*    │       │   Flight_Task_30/150/500ms (vacías por ahora)│
+ └──────────────────────────────────────┘       └─────────────────────────────────────────────┘
+```
+
+- **`Task_1ms`** corre por fases, en este orden: `arnes_piloto` →
+  `arnes_servos_planta` → `arnes_sensores` → `arnes_log_csv` → `arnes_consola`.
+- **`Flight_Task_5ms`**:
+  ```c
+  void Flight_Task_5ms(uint32_t now_ms, uint32_t dt_ms,
+                       const SimRc_s *rc_sim, int mode_cmd,
+                       const FC_SensorsIn *sens,
+                       float servo_cmd_us[SERVO_SIM_N_SERVOS]);
+  ```
+  `mode_cmd` es el switch de modo pedido y manda sobre `rc_sim->s[RC_CH_MODE]`
+  (hoy `main.c` pasa ese mismo canal; después puede venir de la estación
+  terrena o del failsafe). El armado sale de `rc_sim->s[RC_CH_ARM] > 0.5`.
+- **`FC_SensorsIn`** (`flight_management.h`): solo lo que usa el FC (giros,
+  AHRS, IAS, altitud y V_D del GPS, flags `valid`). En el SIL lo llena
+  `fc_sensores_desde_sim()` de `main.c` desde `SensorsSimData`; en el STM32, los
+  drivers. Así el FM no incluye `sensors_sim.h`.
+- **`rc_mixer.c/.h`**: canales RC (`SimRc_s`, `RC_CH_*`), mezcla stick → µs con
+  trim (`rc_to_servo_cmds_us`) y `rc_yaw_deg_per_stick`. El trim del transmisor
+  llega al FM en `FM_Config.trim_us`.
+- La telemetría de los filtros (giros y pitot filtrados, cortes) se lee de
+  `FM_Status`.
+- `Flight_Task_30ms` (wing leveler, F5), `Flight_Task_150ms` (rumbo y
+  navegación, F6) y `Flight_Task_500ms` (health y telemetría) están vacías.
+
+### Leyes de control (`cl_*.c`)
+
+Cada ley vive en su propio `src/cl_<ley>.c/.h`, pura y testeable sola. La
+primera es el yaw damper (`cl_yaw_damper.c`). Para agregar una:
+
+1. `cl_<ley>.c/.h` con struct de estado, `Reset` y `Update` en unidades
+   físicas (deg, deg/s, s). La ley no conoce modos, RC ni validez del estado.
+2. Instancia `static` en `flight_management.c`, con `Reset` en `FM_Init` y al
+   salir del modo.
+3. Llamada desde la `Flight_Task_*` del periodo que le toca, dentro del
+   `switch` de modo. El FM convierte a stick y revisa la validez del estado.
+4. Telemetría en `FM_Status`.
+5. `test/test_cl_<ley>.c`, más un test de lazo cerrado si aplica.
 
 ## Compilar y ejecutar
 
@@ -154,6 +217,26 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+### Regresión de las dos rutinas (todas las columnas)
+
+`test/regresion_tareas.sh` compila y corre `ROUTINE_LAT_DIR` (MANUAL todo el
+vuelo) y `ROUTINE_YAW_DAMPER` (MANUAL → `GYRO_STAB` en t = 5 s) en
+`build_reg_lat/` y `build_reg_yd/`, y compara **las 65 columnas** del CSV
+contra sus líneas base con `compare_csv_cols.py --all` (falla también si el
+header cambia en nombre u orden). Correrlo desde la raíz del repo:
+
+```bash
+bash test/regresion_tareas.sh
+# latdir: OK: 65 columnas identicas en 10000 filas
+# yd: OK: 65 columnas identicas en 10000 filas
+```
+
+Las líneas base son locales (`data/*.csv` no se trackea) y sus rutas están en
+`BASE_LAT` y `BASE_YD` al inicio del script. La vigente es `f140925`
+(`data/baseline_f140925_latdir.csv` y `data/baseline_f140925_yd.csv`); para
+generarlas, compilar y correr las dos rutinas en ese commit y copiar
+`data/SIL_sim_servos2.csv` (ver la sección 4 de `docs/PLAN_FLIGHT_TASKS.md`).
+
 ### Regresión longitudinal contra una línea base
 
 Los canales longitudinal y lateral están desacoplados, así que cambios en el
@@ -186,9 +269,8 @@ columnas del pitot (`pitot_ms`, `tas_ms`, `dp_pa`: V = √(u²+v²+w²) incluye 
 v a segundo orden). Cada sensor tiene su propia secuencia de ruido, así que agregar o
 quitar ruido en uno no cambia las columnas de los demás.
 
-La línea base vigente es `857cec7` (software de vuelo en `Task_5ms`; frente a
-`2632b23`, estados, servos y comandos quedan desplazados exactamente 1 ms); las
-anteriores ya no aplican.
+La línea base vigente es `f140925`, la misma de la regresión de las dos
+rutinas; las anteriores ya no aplican.
 
 ## Documentación teórica (`docs/teoria/`)
 
@@ -299,13 +381,14 @@ El efecto del filtro se ve en flightreview, en *Sensores e Inercial / Filtro gir
 
 ## Pendientes conocidos
 
-- `flight_management.c` solo implementa el modo MANUAL: `Task_5ms` pasa los
-  sticks por `FM_Update_5ms` y la salida es copia exacta de la entrada. El yaw
-  damper funciona en `FM_MODE_GYRO_STAB` (`mode_switch` 3), con los giros filtrados.
-  Estabilizado, rumbo y los tres tiers de control llegan en el Paso 4; por eso
+- `flight_management.c` implementa MANUAL (paso directo: la salida es copia
+  exacta de la entrada) y el yaw damper en `FM_MODE_GYRO_STAB` (`mode_switch`
+  3), con los giros filtrados. Estabilizado y rumbo llegan en F5 y F6; por eso
   `mode_switch` 1 y 2 se ignoran y la espiral sigue inestable.
-  El AHRS es ideal (actitud verdadera más ruido, sigmas propuestos sin medir). Las tareas de 30, 150 y 500 ms en `main.c`
-  tampoco hacen nada todavía.
+  El AHRS es ideal (actitud verdadera más ruido, sigmas propuestos sin medir).
+  `Flight_Task_30ms`, `_150ms` y `_500ms` están vacías todavía.
+- En una fila del CSV, el estado (`du`…`dtheta`, lateral) corresponde a
+  t − 1 ms y los sensores a t (TODO 9.1).
 - El throttle no realimenta la planta, y su `tau`/`rate_limit` de ESC en
   `servo_sim.c` son valores propuestos sin datos de banco.
 - `sim_PWM_processing` se compila pero nadie lo llama.

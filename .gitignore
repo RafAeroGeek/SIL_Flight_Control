@@ -2,6 +2,7 @@
 build/
 build-*/
 build_tests/
+build_reg_*/
 cmake-build-*/
 CMakeCache.txt
 CMakeFiles/

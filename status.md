@@ -1,7 +1,7 @@
 # Status del proyecto — SIL_Flight_Control
 
-**Fecha de revisión:** 2026-11-04
-**Último commit en `main`:** `13493f2` Merge PR #27 (F4: yaw damper y filtro de giros)
+**Fecha de revisión:** 2026-11-07
+**Último commit en `main`:** `f140925` Merge PR #28 (F4+: filtro del pitot)
 **Tags:** `v0.1-mvp` (2026-09-09), `v0.2-lateral` (2026-10-20, `7b4e35c`), `v0.3-dynamics` (2026-10-22, `717c056`)
 **Versión en `CMakeLists.txt`:** 0.3.0
 
@@ -10,20 +10,24 @@
 ## 1. Estado actual
 
 ### Git
-- `main` al día con `origin/main`; PRs #1–#27 mergeados (el #19 entró en
-  `feat/dpsi` y llegó a `main` con el #21). Sin ramas abiertas.
+- PRs #1–#28 mergeados (el #19 entró en `feat/dpsi` y llegó a `main` con el
+  #21). Rama abierta: `refactor/flight-task-5ms` (refactor de tareas de vuelo,
+  `docs/PLAN_FLIGHT_TASKS.md`).
 
-### Build y tests (verificado 2026-11-04)
+### Build y tests (verificado 2026-11-07)
 - Compila con **0 warnings** `-Wall`.
-- **ctest: 14/14** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
+- **ctest: 15/15** (`test_servo_cfg`, `test_aircraft_loader_servo`, `test_rk4_n`,
   `test_aircraft_loader_lat`, `test_aircraft_loader_fcs`, `test_gyro_filter`,
   `test_yaw_damper_cl`, `test_lateral_matrices`,
   `test_pilot_lateral_servo`, `test_lon_matrices`, `test_flight_sim_trim`,
-  `test_atmosphere`, `test_sensors`, `test_flight_management`).
-- **pytest: 82/82** (`dynamics/` 24 + `flightreview/` 58).
-- Línea base de regresión vigente: `data/baseline_857cec7.csv` (local, no
-  trackeada). Frente a `2632b23`, estados, servos y comandos quedan desplazados
-  exactamente 1 ms, bit a bit. Las anteriores ya no aplican.
+  `test_atmosphere`, `test_sensors`, `test_flight_management`,
+  `test_cl_yaw_damper`).
+- **pytest: 82/82** (`dynamics/` 24 + `flightreview/` 58; verificado
+  2026-11-04, sin cambios en Python desde entonces).
+- Línea base de regresión vigente: `f140925`, dos rutinas
+  (`data/baseline_f140925_latdir.csv` y `data/baseline_f140925_yd.csv`, locales,
+  no trackeadas). `bash test/regresion_tareas.sh` compara las 65 columnas de
+  las dos. Las anteriores ya no aplican.
 - Documentación teórica en `docs/teoria/` (LaTeX):
   `sensores/ruido_sensores.tex` y `control/control_lateral.tex`.
 
@@ -58,6 +62,12 @@
 - **F3a+ (PR #23):** ruido de IMU ajustado al log de vuelo, a
   200 Hz con retención y `m = 1`; `imu_sensor.h`, `imu_test` y 6 tests más en
   `test_sensors`.
+- **Refactor de tareas de vuelo (rama `refactor/flight-task-5ms`):**
+  `flight_management.c` administra el software de vuelo con
+  `Flight_Task_5ms` (y el esqueleto de 30/150/500 ms); `main.c` queda como
+  arnés. Yaw damper en `cl_yaw_damper.c/.h` (patrón `cl_*` para las leyes),
+  canales RC y mezcla a µs en `rc_mixer.c/.h`. Refactor puro: CSV idéntico bit
+  a bit en las dos rutinas.
 
 ### Modos del Ugly Stick (estimación teórica)
 | Modo | λ | ωn [rad/s] | ζ |
@@ -77,7 +87,7 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 ### Media prioridad
 | # | Pendiente |
 |---|---|
-| 5.1 / 8.9 | Modos con lazos en `flight_management.c` y tareas 30/150/500 ms de `main.c` vacías → Paso 4 (F3b–F6) |
+| 5.1 / 8.9 | Modos con lazos en `flight_management.c`; `Flight_Task_30/150/500ms` vacías → F5–F6 |
 | 8.12 | Validar inercias (I_x, I_y, I_z), factores empíricos y σ de pitot/veleta con datos de banco y de vuelo; contrastar la vibración medida de la IMU con más vuelos (un solo log: ±50 % en potencia media) |
 | 4.3 | Del `.bin` de ArduPilot: filtros `INS_*_FILTER`, throttle y RPM; agregar `imu_noise_analysis.py` y `sensors_data.csv` para reproducir el ajuste |
 | 8.2 | Contrastar derivadas de control del Navion con Nelson apéndice B |
@@ -96,6 +106,7 @@ Trim: α = θ0 = 5.92°, δe = −0.49°.
 | — | `sim_PWM_processing` se compila pero nadie lo llama |
 | — | Throttle: tau/rate del ESC "PROPUESTOS - REVISAR"; el throttle no realimenta la planta |
 | — | `lon_analysis.py --plots` sin probar (requiere `python-control`) |
+| 9.1–9.6 | Pendientes del refactor de tareas de vuelo (desfase de 1 ms del estado en el CSV, `RcInput_s`, `FM_Update_5ms` `static`, …) |
 
 ---
 
@@ -117,7 +128,8 @@ inserta algo antes de seguir.
 | F3a++ ✅ | Software de vuelo en `Task_5ms` (`FM_Update_5ms`, modo, armado, mezcla a us); `Task_1ms` queda como mundo físico — #25 |
 | F3b ✅ | AHRS ideal con ruido (σ propuestos sin medir), `FM_State` lleno en `Task_5ms`, ganancias de `config/FCS_gains.json`, `FM_Config` con rumbo por alabeo y `mode_switch` mapeado a `FM_Mode` + `FM_YawMode`. Los giros llegan con 4 ms de antigüedad, aceptado frente a los 160 ms que tolera el diseño — #26 |
 | F4 ✅ | Yaw damper en `FM_MODE_GYRO_STAB` (`mode_switch` 3); filtro de 1er orden de giros en `Task_5ms`, corte por eje en `config/FCS_gains.json`; subpestaña "Filtro giros" en flightreview — #27 |
-| F4+ | Filtro de la IAS del pitot en `Task_5ms` (5 Hz, `pitot_fc_hz`), listo para leerse en `Task_30ms`; `pitot_ms_filtered` en el CSV y en flightreview |
+| F4+ ✅ | Filtro de la IAS del pitot en `Task_5ms` (5 Hz, `pitot_fc_hz`), listo para leerse en `Task_30ms`; `pitot_ms_filtered` en el CSV y en flightreview — #28 |
+| Refactor | `Flight_Task_5ms` en `flight_management.c`, leyes en `cl_*.c`, `rc_mixer.c`; `main.c` como arnés (`docs/PLAN_FLIGHT_TASKS.md`) |
 | F5 | Modo estabilizado: wing leveler, stick → φ_cmd; saturación y límite de velocidad a la salida del FM (`fm_slew_limit`, protección, no filtro de ruido); ajustar el corte de `p` |
 | F6 | Heading hold + rutina de piloto con cambio de modo; bloquear el modo 2 si el yaw damper no está activo |
 | F7 | flightreview con setpoints, docs, tag `v0.4-control` |

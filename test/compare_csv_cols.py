@@ -8,6 +8,11 @@ Uso (desde la raiz del repo):
     python3 test/compare_csv_cols.py data/baseline_4affdca.csv data/SIL_sim_servos2.csv \\
         --cols t_s,du_mps,dw_mps,dq_radps,dtheta_rad,y_elev_deg,pitot_ms,AoA_deg,gyro_y_radps,acc_x_mps2,gps_alt_m,laser_alt_m
 
+    python3 test/compare_csv_cols.py data/baseline_f140925_latdir.csv data/cand_latdir.csv --all
+
+Con --all se comparan todas las columnas del baseline y falla si los headers
+difieren en nombre u orden (linea de header comparada tal cual, sin strip).
+
 Sale con 0 si las columnas son identicas y con 1 si hay diferencias (reporta
 la primera fila distinta de cada columna).
 """
@@ -23,18 +28,40 @@ def load(path):
     return df.apply(lambda s: s.str.strip())
 
 
+def raw_header(path):
+    with open(path, newline="") as f:
+        return f.readline().rstrip("\r\n")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("baseline")
     ap.add_argument("candidate")
-    ap.add_argument("--cols", required=True, help="columnas separadas por coma")
+    sel = ap.add_mutually_exclusive_group(required=True)
+    sel.add_argument("--cols", help="columnas separadas por coma")
+    sel.add_argument("--all", action="store_true",
+                     help="todas las columnas del baseline; exige headers iguales")
     args = ap.parse_args()
 
-    cols = [c.strip() for c in args.cols.split(",") if c.strip()]
     base = load(args.baseline)
     cand = load(args.candidate)
 
     ok = True
+    if args.all:
+        cols = list(base.columns)
+        hb, hc = raw_header(args.baseline), raw_header(args.candidate)
+        if hb != hc:
+            nb, nc = hb.split(","), hc.split(",")
+            if len(nb) != len(nc):
+                print(f"Headers distintos: {len(nb)} vs {len(nc)} columnas")
+            for i, (a, b) in enumerate(zip(nb, nc)):
+                if a != b:
+                    print(f"Headers distintos: columna {i + 1}: '{a}' != '{b}'")
+                    break
+            ok = False
+    else:
+        cols = [c.strip() for c in args.cols.split(",") if c.strip()]
+
     missing = [c for c in cols if c not in base.columns or c not in cand.columns]
     if missing:
         print(f"Columnas ausentes: {', '.join(missing)}")

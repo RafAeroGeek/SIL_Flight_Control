@@ -9,11 +9,15 @@
  *   - mapeo de mode_switch mientras ATTITUDE no está implementado
  *   - yaw damper en GYRO_STAB: ley, washout, entrada sin salto, pedal y
  *     estado inválido
+ *   - Flight_Task_5ms (T_FT1..T_FT7): igual al arnés anterior en MANUAL,
+ *     modo desde mode_cmd, armado, retención del pitot, cortes de los
+ *     filtros, validez del estado y entradas NULL
  * =========================================================== */
 #include <math.h>
 #include <string.h>
 
 #include "flight_management.h"
+#include "rc_mixer.h"
 #include "test_util.h"
 
 static const FM_CommandsNorm k_cmd = {
@@ -238,6 +242,215 @@ static void test_yd_reentrada(void)
     EXPECT_FLOAT_EQ(s.cmd_out.yaw_norm, 0.0f);
 }
 
+/* ============================================================
+ * Flight_Task_5ms
+ * ============================================================ */
+#define FT_DT_MS 5u
+
+/* Sensores válidos con valores arbitrarios */
+static FC_SensorsIn sens_validos(void)
+{
+    FC_SensorsIn s;
+    memset(&s, 0, sizeof s);
+    s.gyro_radps[0] = 0.01;  s.gyro_radps[1] = -0.02;  s.gyro_radps[2] = 0.15;
+    s.imu_valid      = true;
+    s.ahrs_phi_deg   = 3.0;  s.ahrs_theta_deg = 1.5;  s.ahrs_psi_deg = -40.0;
+    s.ahrs_valid     = true;
+    s.pitot_ias_ms   = 24.0;
+    s.pitot_valid    = true;
+    s.gps_alt_m      = 1000.0;
+    s.gps_vd_ms      = -0.3;
+    return s;
+}
+
+static SimRc_s rc_sticks(void)
+{
+    SimRc_s rc;
+    memset(&rc, 0, sizeof rc);
+    rc.s[RC_CH_ROLL]     = 0.123456f;
+    rc.s[RC_CH_PITCH]    = -0.37f;
+    rc.s[RC_CH_YAW]      = 0.03f;
+    rc.s[RC_CH_THROTTLE] = 0.6f;
+    rc.s[RC_CH_FLAPS]    = 0.25f;
+    return rc;
+}
+
+/* T_FT1: en MANUAL, Flight_Task_5ms da los mismos us que la mezcla directa
+   del arnés anterior, rc_to_servo_cmds_us(rc, trim_us) */
+static void test_ft_manual_igual_arnes(void)
+{
+    FM_Config cfg;
+    memset(&cfg, 0, sizeof cfg);
+    const float trim_us[SERVO_SIM_N_SERVOS] = { -12.25f, 0.0f, 0.0f, 0.0f };
+    memcpy(cfg.trim_us, trim_us, sizeof trim_us);
+    FM_Init(&cfg, FM_MODE_MANUAL);
+
+    const SimRc_s rc = rc_sticks();
+    const FC_SensorsIn sens = sens_validos();
+    float esperado[SERVO_SIM_N_SERVOS];
+    float us[SERVO_SIM_N_SERVOS];
+    rc_to_servo_cmds_us(&rc, trim_us, esperado);
+
+    for (int k = 0; k < 3; ++k) {
+        Flight_Task_5ms(5u * (uint32_t)(k + 1), FT_DT_MS, &rc, 0, &sens, us);
+        for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) {
+            EXPECT_TRUE(us[i] == esperado[i]);
+        }
+    }
+    EXPECT_TRUE(FM_GetMode() == FM_MODE_MANUAL);
+}
+
+/* T_FT2: el modo sale de mode_cmd, no de rc.s[RC_CH_MODE] */
+static void test_ft_modo_desde_mode_cmd(void)
+{
+    FM_Init(NULL, FM_MODE_MANUAL);
+    SimRc_s rc = rc_sticks();
+    rc.s[RC_CH_MODE] = 0.0f;
+    const FC_SensorsIn sens = sens_validos();
+    float us[SERVO_SIM_N_SERVOS];
+
+    Flight_Task_5ms(5u, FT_DT_MS, &rc, 3, &sens, us);
+    EXPECT_TRUE(FM_GetMode() == FM_MODE_GYRO_STAB);
+
+    /* Al revés: canal en 3 y mode_cmd en 0 -> MANUAL */
+    rc.s[RC_CH_MODE] = 3.0f;
+    Flight_Task_5ms(10u, FT_DT_MS, &rc, 0, &sens, us);
+    EXPECT_TRUE(FM_GetMode() == FM_MODE_MANUAL);
+}
+
+/* T_FT3: armado desde rc.s[RC_CH_ARM] > 0.5 */
+static void test_ft_armado(void)
+{
+    FM_Init(NULL, FM_MODE_MANUAL);
+    SimRc_s rc = rc_sticks();
+    const FC_SensorsIn sens = sens_validos();
+    float us[SERVO_SIM_N_SERVOS];
+
+    rc.s[RC_CH_ARM] = 1.0f;
+    Flight_Task_5ms(5u, FT_DT_MS, &rc, 0, &sens, us);
+    EXPECT_TRUE(FM_IsArmed());
+
+    rc.s[RC_CH_ARM] = 0.4f;
+    Flight_Task_5ms(10u, FT_DT_MS, &rc, 0, &sens, us);
+    EXPECT_FALSE(FM_IsArmed());
+}
+
+/* T_FT4: sin medición válida del pitot, la IAS filtrada se retiene */
+static void test_ft_pitot_invalido_retiene(void)
+{
+    FM_Config cfg;
+    memset(&cfg, 0, sizeof cfg);
+    cfg.pitot_fc_hz = 5.0f;
+    FM_Init(&cfg, FM_MODE_MANUAL);
+
+    const SimRc_s rc = rc_sticks();
+    FC_SensorsIn sens = sens_validos();
+    float us[SERVO_SIM_N_SERVOS];
+    FM_Status s;
+
+    FM_GetStatus(&s);
+    EXPECT_FALSE(s.pitot_con_muestra);
+
+    sens.pitot_ias_ms = 20.0;
+    Flight_Task_5ms(5u, FT_DT_MS, &rc, 0, &sens, us);
+    sens.pitot_ias_ms = 22.0;
+    Flight_Task_5ms(10u, FT_DT_MS, &rc, 0, &sens, us);
+    FM_GetStatus(&s);
+    const double antes = s.pitot_filt_ms;
+    EXPECT_TRUE(s.pitot_con_muestra);
+    EXPECT_TRUE(antes > 20.0 && antes < 22.0);
+
+    sens.pitot_valid  = false;
+    sens.pitot_ias_ms = 50.0;
+    Flight_Task_5ms(15u, FT_DT_MS, &rc, 0, &sens, us);
+    FM_GetStatus(&s);
+    EXPECT_TRUE(s.pitot_filt_ms == antes);
+}
+
+/* T_FT5: los cortes de los filtros salen de la config; sin config, 0 */
+static void test_ft_filtros_desde_config(void)
+{
+    FM_Config cfg;
+    memset(&cfg, 0, sizeof cfg);
+    cfg.gyro_fc_hz[0] = 20.0f; cfg.gyro_fc_hz[1] = 20.0f; cfg.gyro_fc_hz[2] = 20.0f;
+    cfg.pitot_fc_hz = 5.0f;
+    FM_Init(&cfg, FM_MODE_MANUAL);
+
+    FM_Status s;
+    FM_GetStatus(&s);   /* ya visibles antes de la primera Flight_Task_5ms */
+    for (unsigned i = 0u; i < 3u; ++i) EXPECT_TRUE(s.gyro_fc_hz[i] == 20.0f);
+    EXPECT_TRUE(s.pitot_fc_hz == 5.0f);
+
+    const SimRc_s rc = rc_sticks();
+    const FC_SensorsIn sens = sens_validos();
+    float us[SERVO_SIM_N_SERVOS];
+    Flight_Task_5ms(5u, FT_DT_MS, &rc, 0, &sens, us);
+    FM_GetStatus(&s);
+    for (unsigned i = 0u; i < 3u; ++i) EXPECT_TRUE(s.gyro_fc_hz[i] == 20.0f);
+    EXPECT_TRUE(s.pitot_fc_hz == 5.0f);
+
+    FM_Init(NULL, FM_MODE_MANUAL);
+    FM_GetStatus(&s);
+    for (unsigned i = 0u; i < 3u; ++i) EXPECT_TRUE(s.gyro_fc_hz[i] == 0.0f);
+    EXPECT_TRUE(s.pitot_fc_hz == 0.0f);
+
+    /* Sin filtro la salida es la medición */
+    Flight_Task_5ms(5u, FT_DT_MS, &rc, 0, &sens, us);
+    FM_GetStatus(&s);
+    for (unsigned i = 0u; i < 3u; ++i) EXPECT_TRUE(s.gyro_filt_radps[i] == sens.gyro_radps[i]);
+    EXPECT_TRUE(s.pitot_filt_ms == sens.pitot_ias_ms);
+}
+
+/* T_FT6: IMU válida pero AHRS no -> estado inválido: el yaw damper no actúa
+   y el yaw de salida es el pedal */
+static void test_ft_validez_estado(void)
+{
+    FM_Config cfg;
+    memset(&cfg, 0, sizeof cfg);
+    cfg.lat.K_r = 0.42f;
+    cfg.lat.tau_wo_s = 1.0f;
+    cfg.rudder_deg_per_stick = -90.0f;
+    FM_Init(&cfg, FM_MODE_MANUAL);
+
+    const SimRc_s rc = rc_sticks();
+    FC_SensorsIn sens = sens_validos();
+    sens.imu_valid  = true;
+    sens.ahrs_valid = false;
+    float us[SERVO_SIM_N_SERVOS];
+    float esperado[SERVO_SIM_N_SERVOS];
+    rc_to_servo_cmds_us(&rc, cfg.trim_us, esperado);
+
+    for (int k = 0; k < 20; ++k) {
+        sens.gyro_radps[2] = 0.05 * (double)k;   /* r cambiando */
+        Flight_Task_5ms(5u * (uint32_t)(k + 1), FT_DT_MS, &rc, 3, &sens, us);
+
+        FM_Status s;
+        FM_GetStatus(&s);
+        EXPECT_TRUE(s.mode == FM_MODE_GYRO_STAB);
+        EXPECT_TRUE(s.yd_dr_deg == 0.0f);
+        EXPECT_TRUE(s.cmd_out.yaw_norm == rc.s[RC_CH_YAW]);
+        EXPECT_TRUE(us[SERVO_RUDDER] == esperado[SERVO_RUDDER]);
+    }
+}
+
+/* T_FT7: con entradas NULL no escribe la salida y no truena */
+static void test_ft_entradas_null(void)
+{
+    FM_Init(NULL, FM_MODE_MANUAL);
+    const SimRc_s rc = rc_sticks();
+    const FC_SensorsIn sens = sens_validos();
+    float us[SERVO_SIM_N_SERVOS];
+
+    for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) us[i] = -7777.0f;
+    Flight_Task_5ms(5u, FT_DT_MS, &rc, 0, NULL, us);
+    for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) EXPECT_TRUE(us[i] == -7777.0f);
+
+    Flight_Task_5ms(5u, FT_DT_MS, NULL, 0, &sens, us);
+    for (unsigned i = 0u; i < SERVO_SIM_N_SERVOS; ++i) EXPECT_TRUE(us[i] == -7777.0f);
+
+    Flight_Task_5ms(5u, FT_DT_MS, &rc, 0, &sens, NULL);
+}
+
 int main(void)
 {
     test_init();
@@ -251,5 +464,12 @@ int main(void)
     test_yd_washout();
     test_yd_estado_invalido();
     test_yd_reentrada();
+    test_ft_manual_igual_arnes();
+    test_ft_modo_desde_mode_cmd();
+    test_ft_armado();
+    test_ft_pitot_invalido_retiene();
+    test_ft_filtros_desde_config();
+    test_ft_validez_estado();
+    test_ft_entradas_null();
     TEST_RETURN();
 }
