@@ -538,23 +538,20 @@ static void Task_5ms(uint32_t now_ms, uint32_t dt_ms)
     }
 }
 
+/* Tareas lentas: el software de vuelo vive en flight_management.c */
 static void Task_30ms(uint32_t now_ms, uint32_t dt_ms)
 {
-    (void)now_ms; (void)dt_ms;
-    /* Outer loop actitud / setpoint shaping / FBW */
+    Flight_Task_30ms(now_ms, dt_ms);
 }
 
 static void Task_150ms(uint32_t now_ms, uint32_t dt_ms)
 {
-    (void)now_ms; (void)dt_ms;
-    /* Navegación / ALT_HOLD / ARSP_HOLD (setpoints lentos) */
+    Flight_Task_150ms(now_ms, dt_ms);
 }
 
 static void Task_500ms(uint32_t now_ms, uint32_t dt_ms)
 {
-    (void)dt_ms;
-    /* Logging / telemetría / health */
-    /* printf("[t=%ums] phi=%.2f theta=%.2f psi=%.2f\n", now_ms, g_st.phi_deg, g_st.theta_deg, g_st.psi_deg); */
+    Flight_Task_500ms(now_ms, dt_ms);
 }
 
 

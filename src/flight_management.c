@@ -257,3 +257,21 @@ void Flight_Task_5ms(uint32_t now_ms, uint32_t dt_ms,
 
     fm_telemetria_filtros();
 }
+
+void Flight_Task_30ms(uint32_t now_ms, uint32_t dt_ms)
+{
+    (void)now_ms; (void)dt_ms;
+    /* Lazo externo de actitud: wing leveler (cl_wing_leveler, F5) */
+}
+
+void Flight_Task_150ms(uint32_t now_ms, uint32_t dt_ms)
+{
+    (void)now_ms; (void)dt_ms;
+    /* Rumbo y navegación: heading hold (cl_heading_hold, F6) */
+}
+
+void Flight_Task_500ms(uint32_t now_ms, uint32_t dt_ms)
+{
+    (void)now_ms; (void)dt_ms;
+    /* Health y telemetría */
+}

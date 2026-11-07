@@ -1,6 +1,25 @@
 #ifndef FLIGHT_MANAGEMENT_H
 #define FLIGHT_MANAGEMENT_H
 
+/* ============================================================
+ * Software de vuelo (portable al STM32)
+ * ============================================================
+ * flight_management.c administra el software de vuelo: expone una tarea por
+ * periodo del RTOS (Flight_Task_5ms/30ms/150ms/500ms) y decide qué leyes de
+ * control corren según el modo. Cada ley vive en su propio cl_<ley>.c/.h.
+ *
+ * Patrón para agregar una ley de control:
+ *   1. cl_<ley>.c/.h con struct de estado, Reset y Update en unidades
+ *      físicas (deg, deg/s, s). La ley no conoce modos, RC ni validez del
+ *      estado (ejemplo: cl_yaw_damper.c/.h).
+ *   2. Instancia static en flight_management.c, con Reset en FM_Init y al
+ *      salir del modo.
+ *   3. Llamada desde la Flight_Task_* del periodo que le toca, dentro del
+ *      switch de modo. El FM convierte a stick y revisa la validez del estado.
+ *   4. Telemetría en FM_Status.
+ *   5. test/test_cl_<ley>.c, más un test de lazo cerrado si aplica.
+ */
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -223,6 +242,14 @@ void Flight_Task_5ms(uint32_t now_ms, uint32_t dt_ms,
                      const FC_SensorsIn *sens,
                      float servo_cmd_us[SERVO_SIM_N_SERVOS]);
 
+/* Tarea de 30 ms (vacía por ahora): lazo externo de actitud, wing leveler (F5) */
+void Flight_Task_30ms(uint32_t now_ms, uint32_t dt_ms);
+
+/* Tarea de 150 ms (vacía por ahora): rumbo y navegación, heading hold (F6) */
+void Flight_Task_150ms(uint32_t now_ms, uint32_t dt_ms);
+
+/* Tarea de 500 ms (vacía por ahora): health y telemetría */
+void Flight_Task_500ms(uint32_t now_ms, uint32_t dt_ms);
 
 /* =========================
  * API
